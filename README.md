@@ -44,26 +44,27 @@ python examples/vdp/run_vdp_pod_ilqr.py
 ```
 
 ## Results
-<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">
-  <figure style="width:320px;margin:0;display:flex;flex-direction:column;align-items:center;">
-    <img src="GIFs/Swimmer.gif" alt="15-link Swimmer" width="320" />
-    <figcaption style="font-size:0.95em;text-align:center;margin-top:6px;">15-link Swimmer <br/> (34 states, 8 outputs, 14 control channels)</figcaption>
-  </figure>
 
-  <figure style="width:320px;margin:0;display:flex;flex-direction:column;align-items:center;">
-    <img src="GIFs/Fish.gif" alt="Fish" width="320" />
-    <figcaption style="font-size:0.95em;text-align:center;margin-top:6px;">Fish <br/> (27 states, 7 outputs, 6 control channels)</figcaption>
-  </figure>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 24px; margin: 20px 0;">
+  <div style="text-align: center;">
+    <img src="GIFs/Swimmer.gif" alt="15-link Swimmer" style="width: 100%; max-width: 400px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+    <p style="margin: 12px 0;"><strong>15-link Swimmer</strong><br/>34 states, 8 outputs, 14 control channels</p>
+  </div>
 
-  <figure style="width:320px;margin:0;display:flex;flex-direction:column;align-items:center;">
-    <img src="GIFs/Tensegrity.gif" alt="Tensegrity Robot" width="320" />
-    <figcaption style="font-size:0.95em;text-align:center;margin-top:6px;">Tensegrity Robot <br/> (150 states, 24 outputs, 46 control channels)</figcaption>
-  </figure>
+  <div style="text-align: center;">
+    <img src="GIFs/Fish.gif" alt="Fish" style="width: 100%; max-width: 400px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+    <p style="margin: 12px 0;"><strong>Fish</strong><br/>27 states, 7 outputs, 6 control channels</p>
+  </div>
 
-  <figure style="width:320px;margin:0;display:flex;flex-direction:column;align-items:center;">
-    <img src="GIFs/AllanCahn.gif" alt="AllanCahn" width="320" />
-    <figcaption style="font-size:0.95em;text-align:center;margin-top:6px;">Allan–Cahn PDE<br/> (2500 states, 16 outputs, 4 control channels)</figcaption>
-  </figure>
+  <div style="text-align: center;">
+    <img src="GIFs/Tensegrity.gif" alt="Tensegrity Robot" style="width: 100%; max-width: 400px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+    <p style="margin: 12px 0;"><strong>Tensegrity Robot</strong><br/>150 states, 24 outputs, 46 control channels</p>
+  </div>
+
+  <div style="text-align: center;">
+    <img src="GIFs/AllanCahn.gif" alt="AllanCahn" style="width: 100%; max-width: 400px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+    <p style="margin: 12px 0;"><strong>Allan–Cahn PDE</strong><br/>2500 states, 16 outputs, 4 control channels</p>
+  </div>
 </div>
 
 ## Citation
