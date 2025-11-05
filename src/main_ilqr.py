@@ -56,6 +56,8 @@ class iLQR:
     def iterate_ilqr(self, n_iter, u_init=None):
         '''
 			Main function that carries out the algorithm at higher level
+            n_iter : Number of iLQR iterations to run
+            u_init : Initial guess for control trajectory         
 		'''
 
 		# Initialize the trajectory with the desired initial guess
@@ -100,13 +102,15 @@ class iLQR:
         # Initialize before forward pass
         del_J_alpha = 0
 
-        Fx_Fu = self.ltv_sys_id.traj_sys_id_state_pertb(np.concatenate((self.X_0.reshape(1, self.n_x, 1), self.X), axis=0), self.U)
-        # Fx_Fu = self.ltv_sys_id.traj_sys_id(np.concatenate((self.X_0.reshape(1, self.n_x, 1), self.X), axis=0), self.U.reshape(self.N,self.n_u))
+        # State Perturbation based SysID
+        # Fx_Fu = self.ltv_sys_id.traj_sys_id_state_pertb(np.concatenate((self.X_0.reshape(1, self.n_x, 1), self.X), axis=0), self.U)
+        
+        # Control Perturbation based SysID
+        Fx_Fu = self.ltv_sys_id.traj_sys_id(np.concatenate((self.X_0.reshape(1, self.n_x, 1), self.X), axis=0), self.U)
+        
         for t in range(self.N-1, -1, -1):
             F_x = Fx_Fu[t][:,:self.n_x]
             F_u = Fx_Fu[t][:,self.n_x:]
-            # F_x = A_aug[t]
-            # F_u = B_aug[t]
             if t>0:
                 Q_x, Q_u, Q_xx, Q_uu, Q_ux = self.get_gradients(F_x,F_u,self.X[t-1],self.U[t],V_x[t], V_xx[t])
             else:
@@ -167,6 +171,16 @@ class iLQR:
         return forward_pass_flag
 
     def get_gradients(self,F_x,F_u,x,u,V_x_next, V_xx_next):
+        """
+        Compute the gradients of Q function
+        F_x : (nx,nx)
+        F_u : (nx,nu)
+        x : (nx,1)
+        u : (nu,1)
+        V_x_next : (nx,1)
+        V_xx_next : (nx,nx)
+        returns : Q_x, Q_u, Q_xx, Q_uu, Q_
+        """
 
         Q_x = self.l_x(x) + ((F_x.T) @ V_x_next)
         Q_u = self.l_u(u) + ((F_u.T) @ V_x_next)
@@ -201,7 +215,10 @@ class iLQR:
         return (((x - self.X_N).T @ self.Q_final) @ (x - self.X_N)) 
 
     def initialize_traj(self,u_init):
-        #TODO: check this vectorize function, deprecate the for loop below
+        """
+        Initialize the nominal trajectory with an initial guess for control
+        u_init : (N, n_u, 1)
+        """
         if u_init is None:
             self.U = np.random.normal(0, self.nominal_init_stddev, (self.N, self.n_u, 1))
         else:
@@ -257,7 +274,10 @@ class iLQR:
         plt.show()
 
     def save_policy(self, path_to_file):
-
+        """
+        Save the learned policy to a json file
+        path_to_file : string
+        """
         Pi = {}
 		# Open-loop part of the policy
         Pi['U'] = {}

@@ -15,10 +15,10 @@ class LTV_SysID:
 
     def sys_id_state_pertb(self, x_t, u_t):
         '''
-            x_t = (nx,1)
-            u_t = (nu,1)
-			system identification for a given nominal state and control
-			returns - a numpy array with F_x and F_u horizantally stacked
+        System identification at a single time step using state perturbations
+        x_t : (n_x, 1)
+        u_t : (n_u, 1)
+        returns : AB : (n_x, n_x+n_u)
 		'''
 		################## defining local functions & variables for faster access ################
         n_x = self.n_x
@@ -39,6 +39,9 @@ class LTV_SysID:
         '''
         Need a simulate function from the actual example
         forward_simulate(self,x,u)
+        X : (n_samples, n_x)
+        U : (n_samples, n_u)
+        returns : X_next : (n_samples, n_x)
         '''
         X_next = np.zeros((X.shape[0], self.n_x))
         for i in range(X.shape[0]):
@@ -47,6 +50,12 @@ class LTV_SysID:
         return X_next
 
     def traj_sys_id_state_pertb(self,x_nom,u_nom):
+        """
+        System identification over the entire trajectory using state perturbations
+        x_nom : (N+1, n_x, 1)
+        u_nom : (N, n_u, 1)
+        returns : traj_AB : (N, n_x, n_x+n_u)
+        """
         traj_AB = []
         for i in range(u_nom.shape[0]):
             traj_AB.append(self.sys_id_state_pertb(x_nom[i],u_nom[i]))
@@ -54,33 +63,44 @@ class LTV_SysID:
         return np.array(traj_AB)
     
     def traj_sys_id(self, x_nom, u_nom, central_diff=0): #TODO rollout 
-        
-        
+        """
+        System identification over the entire trajectory using control perturbations
+        x_nom : (N+1, n_x, 1)
+        u_nom : (N, n_u, 1)
+        returns : traj_AB : (N, n_x, n_x+n_u)
+        """            
         delta_x = np.zeros(((self.N+1), self.n_x, self.n_samples))
-        X, U_ = self.generate_rollouts(x_nom, u_nom)
+        X_pertb, U_pertb = self.generate_rollouts(x_nom, u_nom)
         traj_AB = []
 
         # Generating delta_x for all rollouts
         for i in range(self.N+1):
-            delta_x[i] = X[i] - x_nom[i]
+            delta_x[i] = X_pertb[i] - x_nom[i]
             if i>0:
-                regressor = np.hstack([delta_x[i-1,:].T, (U_[i-1].T).reshape(self.n_samples, self.n_u)])
+                regressor = np.hstack([delta_x[i-1,:].T, (U_pertb[i-1].T).reshape(self.n_samples, self.n_u)])
                 AB = np.linalg.lstsq(regressor, delta_x[i].T, rcond=None)[0].T
                 traj_AB.append(AB)
                            
-        return traj_AB
+        return np.array(traj_AB)
     
     def generate_rollouts(self, x_nom, u_nom):
+        """
+        Generate rollouts around nominal trajectory using control perturbations
+        x_nom : (N+1, n_x, 1)
+        u_nom : (N, n_u, 1)
+        returns : X_pertb : (N+1, n_x, n_samples)
+                  U_pertb : (N, n_u, n_samples)
+        """
         # Taking control perturbations as a function of max control
         u_max = np.max(abs(u_nom))
-        U_ = self.sigma*u_max*np.random.normal(0, self.sigma, (self.N+1, self.n_u, self.n_samples))
-        X = np.zeros((self.N+1, self.n_x, self.n_samples))
+        U_pertb = self.sigma*u_max*np.random.normal(0, 1, (self.N+1, self.n_u, self.n_samples))
+        X_pertb = np.zeros((self.N+1, self.n_x, self.n_samples))
         ctrl = np.zeros((self.n_u, 1))
 
         for j in range(self.n_samples):
-            X[0, :, j] = x_nom[0].flatten()
+            X_pertb[0, :, j] = x_nom[0].flatten()
             for i in range(self.N):
-                ctrl[:] = u_nom[i] + U_[i,:,j].reshape(np.shape(u_nom[i]))
-                X[i+1, :, j] = self.model.simulate(X[i, :, j], ctrl.flatten()).flatten()
+                ctrl[:] = u_nom[i] + U_pertb[i,:,j].reshape(np.shape(u_nom[i]))
+                X_pertb[i+1, :, j] = self.model.simulate(X_pertb[i, :, j], ctrl.flatten()).flatten()
 
-        return X, U_
+        return X_pertb, U_pertb

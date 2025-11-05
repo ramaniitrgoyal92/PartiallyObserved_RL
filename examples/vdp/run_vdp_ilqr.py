@@ -56,7 +56,7 @@ if __name__=="__main__":
 
     # Create iLQR instance
     ilqr = iLQR(run_vdp, state_dimension, control_dimension, alpha, horizon, init_state, final_state, Q, Q_final, R, 
-                nominal_init_stddev, n_sys_id_samples=20, pert_sys_id_sigma=1e-3, arma_sys_id_flag = False)
+                nominal_init_stddev, n_sys_id_samples=50, pert_sys_id_sigma=1e-3, arma_sys_id_flag = True)
     ilqr.iterate_ilqr(n_iterations)
 
     ilqr.plot_episodic_cost_history(path_to_training_cost_fig)
@@ -64,7 +64,7 @@ if __name__=="__main__":
     ilqr.save_cost(path_to_cost_file)
 
     # Check and Simulate the obtained policy
-    print
+    # print
     run_vdp.simulate_vdp(y_init = init_state.flatten(), u = ilqr.U.flatten(), horizon=horizon)
     run_vdp.draw_figure(path_to_traj_fig)
 

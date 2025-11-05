@@ -159,11 +159,21 @@ class POD_iLQR(iLQR):
 
     
     def l_x(self, x):
+        """
+        Compute the gradient of the running cost
+        x : (n_x,1)
+        returns : l_x : (n_x,1)
+        """
         z = np.zeros((np.shape(self.Q)[0], 1))
         z[:self.n_z,:] = self.C @(x - self.X_N)
         return 2*self.Q @ z
 
     def l_x_f(self, x):
+        """
+        Compute the gradient of the terminal cost
+        x : (n_x,1)
+        returns : l_x_f : (n_x,1)
+        """
         z = np.zeros((np.shape(self.Q)[0], 1))
         z[:self.n_z,:] = self.C @(x - self.X_N)
         return 2*self.Q_final @ z

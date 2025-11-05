@@ -17,55 +17,50 @@ class ARMA_LTV_SysID(LTV_SysID):
             n_samples: number of perturbed trajectories
             pert_sigma: perturbation standard deviation for actions
         """
-        super().__init__(MODEL, n_x, n_u, n_samples, pert_sigma)
-        self.model = MODEL
-        self.n_x = n_x
-        self.n_u = n_u
+        # super().__init__(MODEL, n_x, n_u, N, n_samples, pert_sigma)
+        LTV_SysID.__init__(self, MODEL, n_x, n_u, N, n_samples = n_samples, pert_sigma = pert_sigma)
         self.n_z = n_z
         self.C = C
         self.q = q
         self.q_u = q_u
-        self.N = N
-        self.sigma = pert_sigma
-        self.n_samples = n_samples
-        self.pert_sigma = pert_sigma
-        
-        #LTV_SysID.__init__(self, MODEL, n_x, n_u, n_samples, pert_sigma)
 
     def traj_sys_id(self, x_nom, u_nom):
-
         '''
             system identification for a given nominal state and control
+            x_nom = (N+1, n_x, 1)
+            u_nom = (N, n_u, 1)
             returns - a numpy array with F_x and F_u horizantally stacked
 		'''
 		################## defining local functions & variables for faster access ################
-        n_x = self.n_x
-        n_u = self.n_u
-        n_z = self.n_z
-        q = self.q
-        q_u = self.q_u
-        N = self.N
+        n_z, N = self.n_z, self.N
         self.X_0 = (x_nom[0]).reshape(n_z,1)
         Z_nom = x_nom
 		##########################################################################################
         # Generating perturbations
-        X, U_ = self.generate_rollouts(x_nom, u_nom)
-        Z = self.C @ X
-        U_ = U_.reshape(self.N+1*n_u, self.n_samples).T       
-        delta_z = np.zeros((self.n_samples, n_z*(N+1)))
+        X_pertb, U_pertb = self.generate_rollouts(x_nom, u_nom)
+        # print(X_pertb.shape, U_pertb.shape)
+        Z = self.C @ X_pertb
+        # print(Z.shape)
+        U_pertb = U_pertb.reshape((self.N+1)*self.n_u, self.n_samples).T
+        # print(U_pertb.shape)
+        delta_z = np.zeros((self.n_samples, self.n_z*(N+1)))
         
         # Generating delta_z for all rollouts
         for j in range(self.n_samples):
             for i in range(N):
-                delta_z[j, n_z*(N-i-1):n_z*(N-i)] = Z[i+1,j] - Z_nom[i+1]
+                delta_z[j, n_z*(N-i-1):n_z*(N-i)] = Z[i+1,:,j] - Z_nom[i+1,0]
         
-        return self.arma_fit(delta_z, U_, self.n_z, self.n_u, self.q, self.q_u, self.N, self.n_samples)
+        return self.arma_fit(delta_z, U_pertb)
  
 
-    def arma_fit(self, delta_z, U_, n_z, n_u, q, q_u, N, n_samples):
+    def arma_fit(self, delta_z, U_pertb):
         """
         ARMA LTV fitting with A_aug and B_aug construction
         """
+        ################## defining local functions & variables for faster access ################
+        n_z, n_u, q, q_u, N, n_samples = self.n_z, self.n_u, self.q, self.q_u, self.N, self.n_samples
+        ##########################################################################################
+
         fitcoef = np.zeros((n_z, n_z*q + n_u*q_u, N))
     
         # Handle edge case: when q_u=1, there's no control history to store
@@ -107,7 +102,7 @@ class ARMA_LTV_SysID(LTV_SysID):
         for i in range(max(q, q_u), N):
             # Build regressors - same as before
             M1[:, :n_z*q] = delta_z[:, n_z*(N-i):n_z*(N-i+q)]
-            M1[:, n_z*q:] = U_[:, n_u*(N-i):n_u*(N-i+q_u)]
+            M1[:, n_z*q:] = U_pertb[:, n_u*(N-i):n_u*(N-i+q_u)]
             delta[:, :] = delta_z[:, n_z*(N-i-1):n_z*(N-i)]
             
             # Solve least squares
@@ -163,4 +158,5 @@ class ARMA_LTV_SysID(LTV_SysID):
                     rows_to_fill = min(remaining_rows, b_ctrl_block.shape[0])
                     B_aug[i, top_rows:top_rows+rows_to_fill, :] = b_ctrl_block[:rows_to_fill, :]
         
-        return A_aug, B_aug
+        AB_aug = np.concatenate((A_aug, B_aug), axis=2)
+        return AB_aug
