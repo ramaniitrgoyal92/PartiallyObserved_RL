@@ -56,6 +56,9 @@ class ARMA_LTV_SysID(LTV_SysID):
     def arma_fit(self, delta_z, U_pertb):
         """
         ARMA LTV fitting with A_aug and B_aug construction
+        delta_z : (n_samples, n_z*(N+1))
+        U_pertb : (n_u*(N+1),n_samples)
+        returns : AB_aug : (N, n_z*q + n_u*q_u, n_z*q + n_u*q_u + n_u)
         """
         ################## defining local functions & variables for faster access ################
         n_z, n_u, q, q_u, N, n_samples = self.n_z, self.n_u, self.q, self.q_u, self.N, self.n_samples
