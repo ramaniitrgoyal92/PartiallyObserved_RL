@@ -134,7 +134,11 @@ class POD_iLQR(iLQR):
         return backward_pass_flag, del_J_alpha 
     
     def forward_pass(self, del_J_alpha):
-
+        """
+            Forward pass with line search
+            del_J_alpha : expected cost reduction scaled with alpha
+            returns : forward_pass_flag : 1 if forward pass is successful else 0
+        """
         #cost before forward pass
         J1 = self.calculate_total_cost(self.X_0, self.X, self.U, self.N)
 
@@ -156,6 +160,16 @@ class POD_iLQR(iLQR):
         return forward_pass_flag
 
     def get_gradients(self,F_x,F_u,x,u, V_z, V_zz):
+        """
+        Compute the gradients of Q function
+        F_x : (nx,nx)
+        F_u : (nx,nu)
+        x : (nx,1)
+        u : (nu,1)
+        V_x_next : (nx,1)
+        V_xx_next : (nx,nx)
+        returns : Q_x, Q_u, Q_xx, Q_uu, Q_
+        """
         # Exactly same from iLQR, will be removed later
         # Q_z = self.l_x(traj[:,t].reshape(self.n_x,1)) + ((F_x.T) @ V_z)
         Q_z = self.l_x(x) + ((F_x.T) @ V_z)
@@ -169,6 +183,9 @@ class POD_iLQR(iLQR):
         
     
     def forward_pass_simulate(self):
+        """ 
+        Simulate the system with updated controls 
+        """
         for t in range(self.N):
             if t==0:
                 self.U[t] = self.U_temp[t] + self.alpha*self.k[t] #TODO check for K(x-X_0)
