@@ -23,7 +23,7 @@ class iLQR:
             self.ltv_sys_id = ARMA_LTV_SysID(self.model, n_x, n_u, n_x, np.eye(n_x), 1, 1, self.N, n_samples=n_sys_id_samples, pert_sigma = pert_sys_id_sigma)
         else:
             from ltv_sys_id import LTV_SysID
-            self.ltv_sys_id = LTV_SysID(self.model, n_x, n_u, n_samples = n_sys_id_samples, N = self.N, pert_sigma = pert_sys_id_sigma)
+            self.ltv_sys_id = LTV_SysID(self.model, n_x, n_u, N = self.N, n_samples = n_sys_id_samples, pert_sigma = pert_sys_id_sigma)
 
         widgets = [Percentage(), '   ', ETA(), ' (', Timer(), ')']
         self.pbar = ProgressBar(widgets=widgets)
@@ -125,6 +125,7 @@ class iLQR:
                 K = np.copy(self.K)
                 V_x = np.copy(self.V_x)
                 V_xx = np.copy(self.V_xx)
+                break
 
             else:
                 backward_pass_flag = 1

@@ -64,7 +64,6 @@ if __name__=="__main__":
     ilqr.save_cost(path_to_cost_file)
 
     # Check and Simulate the obtained policy
-    # print
     run_vdp.simulate_vdp(y_init = init_state.flatten(), u = ilqr.U.flatten(), horizon=horizon)
     run_vdp.draw_figure(path_to_traj_fig)
 
