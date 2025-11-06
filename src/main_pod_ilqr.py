@@ -1,27 +1,35 @@
 import numpy as np
 import math
 from main_ilqr import iLQR
+from arma_ltv_sys_id import ARMA_LTV_SysID
 np.random.seed(42)
 
 class POD_iLQR(iLQR):
 
-    def __init__(self, C, MODEL, n_x, n_u, alpha, horizon, init_state, final_state, n_z, q, q_u, Q, Q_final, R, 
+    def __init__(self, C, MODEL, n_u, alpha, horizon, init_state, final_state, n_z, q, q_u, Q, Q_final, R, 
                  nominal_init_stddev, n_sys_id_samples, pert_sys_id_sigma, arma_sys_id_flag = True):
-        iLQR.__init__(self, MODEL, n_x, n_u, alpha, horizon, init_state, final_state, 
+        iLQR.__init__(self, MODEL, n_z*q+n_u*(q_u-1), n_u, alpha, horizon, init_state, final_state, 
                       Q, Q_final, R, nominal_init_stddev, n_sys_id_samples, pert_sys_id_sigma, arma_sys_id_flag = arma_sys_id_flag)
         self.C = C
         self.n_z = n_z
         self.q = q
         self.q_u = q_u
-        self.K = np.zeros((self.N, self.n_u, n_z*q+self.n_u*(q_u-1)))
-        self.k = np.zeros((self.N, self.n_u, 1))
+
+        self.Z = np.zeros((self.N, self.n_z, 1))
+        self.Z_temp = np.zeros((self.N, self.n_z, 1))
+
+
+        # self.K = np.zeros((self.N, self.n_u, n_z*q+self.n_u*(q_u-1)))
+        # self.k = np.zeros((self.N, self.n_u, 1))
 		
         self.V_zz = np.zeros((self.N, n_z*q+self.n_u*(q_u-1), n_z*q+self.n_u*(q_u-1)))
         self.V_z = np.zeros((self.N, n_z*q+self.n_u*(q_u-1), 1))
-
         
+        self.ltv_sys_id = ARMA_LTV_SysID(self.model, self.n_x, n_u, n_z, C, q, q_u, self.N, n_samples=n_sys_id_samples, pert_sigma = pert_sys_id_sigma)
+        
+
     def iterate_ilqr(self, n_iter, u_init=None):
-    # exactly same from iLQR, will be removed later
+        # exactly same from iLQR, will be removed later
         '''
 			Main function that carries out the algorithm at higher level
 		'''
@@ -82,7 +90,7 @@ class POD_iLQR(iLQR):
         # for t in range(self.N-1, max(self.q, self.q_u)-1, -1):
         #     F_x = A_aug[t]
         #     F_u = B_aug[t]
-        
+
             if t>0:
                 Q_z, Q_u, Q_zz, Q_uu, Q_uz = self.get_gradients(F_x,F_u,self.X[t-1],self.U[t],V_z[t], V_zz[t])
             else:
@@ -159,10 +167,10 @@ class POD_iLQR(iLQR):
         for t in range(self.N):
             if t==0:
                 self.U[t] = self.U_temp[t] + self.alpha*self.k[t] #TODO check for K(x-X_0)
-                self.X[t] = self.model.simulate(self.X_0.flatten(),self.U[t].flatten()).reshape(np.shape(self.X_0))
+                self.Z[t] = self.model.simulate(self.X_0.flatten(),self.U[t].flatten()).reshape(self.n_z,1)
             else:
                 self.U[t] = self.U_temp[t] + self.alpha*self.k[t] + (self.K[t] @ (self.X[t-1] - self.X_temp[t-1]))
-                self.X[t] = self.model.simulate(self.X[t-1].flatten(),self.U[t].flatten()).reshape(np.shape(self.X_0))
+                self.Z[t] = self.model.simulate(self.X[t-1].flatten(),self.U[t].flatten()).reshape(self.n_z,1)
 
     
     def l_x(self, x):
@@ -175,11 +183,11 @@ class POD_iLQR(iLQR):
         z[:self.n_z,:] = self.C @(x - self.X_N)
         return 2*self.Q @ z
 
-    def l_x_f(self, x):
+    def l_x_N(self, x):
         """
         Compute the gradient of the terminal cost
         x : (n_x,1)
-        returns : l_x_f : (n_x,1)
+        returns : l_x_N : (n_x,1)
         """
         z = np.zeros((np.shape(self.Q)[0], 1))
         z[:self.n_z,:] = self.C @(x - self.X_N)

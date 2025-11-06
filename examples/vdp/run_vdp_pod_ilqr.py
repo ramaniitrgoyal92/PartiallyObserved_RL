@@ -53,15 +53,15 @@ if __name__=="__main__":
 	
     # No. of ILQR iterations to run
     n_iterations = 60
-    # C = np.array([1.0, 0])
-    C = np.eye(2)
+    C = np.array([1.0, 0])
+    # C = np.eye(2)
     n_z = C.shape[0]
 
     # Create model instance
     run_vdp = RunVdp(mu, state_dimension, control_dimension, dt, C)
 
     # Create iLQR instance
-    ilqr = POD_iLQR(C, run_vdp, state_dimension, control_dimension, alpha, horizon, init_state, final_state, n_z, q, q_u, Q, Q_final, R, 
+    ilqr = POD_iLQR(C, run_vdp, control_dimension, alpha, horizon, init_state, final_state, n_z, q, q_u, Q, Q_final, R, 
                 nominal_init_stddev, n_sys_id_samples=50, pert_sys_id_sigma=1e-3, arma_sys_id_flag = True)
     ilqr.iterate_ilqr(n_iterations)
 
@@ -74,9 +74,9 @@ if __name__=="__main__":
     #run_vdp.draw_figure(path_to_traj_fig)
 
     # Test sys_id
-    arma_ltv_sysid = ARMA_LTV_SysID(run_vdp, state_dimension, control_dimension, 1, C, q, q_u, horizon, n_samples=500, pert_sigma = 1e-3)
-    x_t = np.array([2.0,0.0]).reshape(state_dimension,1)
-    u_t = np.array([0]).reshape(control_dimension,1)
+    # arma_ltv_sysid = ARMA_LTV_SysID(run_vdp, state_dimension, control_dimension, n_z, C, q, q_u, horizon, n_samples=500, pert_sigma = 1e-3)
+    # x_t = np.array([2.0,0.0]).reshape(state_dimension,1)
+    # u_t = np.array([0]).reshape(control_dimension,1)
     
-    A, B = arma_ltv_sysid.traj_sys_id(C @ (np.concatenate((ilqr.X_0.reshape(1, ilqr.n_x, 1), ilqr.X), axis=0)), ilqr.U.reshape(horizon, control_dimension))
-    print(A, B)
+    # A, B = arma_ltv_sysid.traj_sys_id((np.concatenate((ilqr.X_0.reshape(1, ilqr.n_x, 1), ilqr.X), axis=0)), ilqr.U.reshape(horizon, control_dimension))
+    # print(A, B)

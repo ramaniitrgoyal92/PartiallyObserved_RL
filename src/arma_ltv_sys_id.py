@@ -48,8 +48,7 @@ class ARMA_LTV_SysID(LTV_SysID):
                 delta_z[j, n_z*(N-i-1):n_z*(N-i)] = Z[i+1,:,j] - Z_nom[i+1,0] 
         
         return self.arma_fit(delta_z, U_pertb)
- 
-
+    
     def arma_fit(self, delta_z, U_pertb):
         """
         ARMA LTV fitting with A_aug and B_aug construction
