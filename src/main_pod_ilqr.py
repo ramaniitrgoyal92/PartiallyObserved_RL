@@ -27,11 +27,11 @@ class POD_iLQR(iLQR):
         
         self.ltv_sys_id = ARMA_LTV_SysID(self.model, self.n_x, n_u, n_z, C, q, q_u, self.N, n_samples=n_sys_id_samples, pert_sigma = pert_sys_id_sigma)
         
-
     def iterate_ilqr(self, n_iter, u_init=None):
         # exactly same from iLQR, will be removed later
         '''
 			Main function that carries out the algorithm at higher level
+            n_iter : number of iLQR iterations
 		'''
 
 		# Initialize the trajectory with the desired initial guess
@@ -62,6 +62,11 @@ class POD_iLQR(iLQR):
             self.episodic_cost_history.append(self.calculate_total_cost(self.X_0, self.X, self.U, self.N))
 
     def backward_pass(self):
+        """
+        Carry out the backward pass to compute the feedforward and feedback gains
+        returns : backward_pass_flag : indicates if backward pass was successful
+                  del_J_alpha : expected cost reduction
+        """
         ################## defining local functions & variables for faster access ################
         k = self.k
         K = self.K
