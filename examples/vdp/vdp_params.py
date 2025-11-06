@@ -18,8 +18,8 @@ dt = 0.01
 horizon = 20 #800
 nominal_init_stddev = 0.1
 
-q = 2
-q_u = 2
+q = 1
+q_u = 1
 alpha = 0.7
 
 # Cost parameters for feedback design

@@ -14,3 +14,9 @@ Add comparison results with DDPG/SAC/TD3/PPO
 jax version
 pytorch/CUDA version
 Parallelize for HPC?
+
+Quadruped - Contact
+State/control constraint
+
+
+

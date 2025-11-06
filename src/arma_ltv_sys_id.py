@@ -38,17 +38,14 @@ class ARMA_LTV_SysID(LTV_SysID):
 		##########################################################################################
         # Generating perturbations
         X_pertb, U_pertb = self.generate_rollouts(x_nom, u_nom)
-        # print(X_pertb.shape, U_pertb.shape)
-        Z = self.C @ X_pertb
-        # print(Z.shape)
+        Z = self.C @ X_pertb #TODO : (N+1,nx,n_samples) -> (N+1,nz,n_samples)
         U_pertb = U_pertb.reshape((self.N+1)*self.n_u, self.n_samples).T
-        # print(U_pertb.shape)
         delta_z = np.zeros((self.n_samples, self.n_z*(N+1)))
         
         # Generating delta_z for all rollouts
         for j in range(self.n_samples):
             for i in range(N):
-                delta_z[j, n_z*(N-i-1):n_z*(N-i)] = Z[i+1,:,j] - Z_nom[i+1,0]
+                delta_z[j, n_z*(N-i-1):n_z*(N-i)] = Z[i+1,:,j] - Z_nom[i+1,0] 
         
         return self.arma_fit(delta_z, U_pertb)
  
@@ -57,8 +54,8 @@ class ARMA_LTV_SysID(LTV_SysID):
         """
         ARMA LTV fitting with A_aug and B_aug construction
         delta_z : (n_samples, n_z*(N+1))
-        U_pertb : (n_u*(N+1),n_samples)
-        returns : AB_aug : (N, n_z*q + n_u*q_u, n_z*q + n_u*q_u + n_u)
+        U_pertb : (n_samples, n_u*(N+1))
+        returns : AB_aug : (N, n_z*q + n_u*(q_u-1), n_z*q + n_u*q_u)
         """
         ################## defining local functions & variables for faster access ################
         n_z, n_u, q, q_u, N, n_samples = self.n_z, self.n_u, self.q, self.q_u, self.N, self.n_samples

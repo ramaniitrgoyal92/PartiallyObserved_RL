@@ -17,6 +17,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 from sim_vdp import SimulateVDP
 from vdp_params import *
 from main_ilqr import iLQR
+from main_pod_ilqr import POD_iLQR
 from ltv_sys_id import LTV_SysID
 from arma_ltv_sys_id import ARMA_LTV_SysID
 import sys
@@ -51,20 +52,22 @@ if __name__=="__main__":
     print('Goal phase : \n', final_state)
 	
     # No. of ILQR iterations to run
-    n_iterations = 10
-    C = np.array([1.0, 0])
+    n_iterations = 60
+    # C = np.array([1.0, 0])
+    C = np.eye(2)
+    n_z = C.shape[0]
 
     # Create model instance
     run_vdp = RunVdp(mu, state_dimension, control_dimension, dt, C)
 
     # Create iLQR instance
-    ilqr = iLQR(run_vdp, state_dimension, control_dimension, alpha, horizon, init_state, final_state, Q, Q_final, R, 
-                nominal_init_stddev, n_sys_id_samples=500, pert_sys_id_sigma=1e-3)
-    #ilqr.iterate_ilqr(n_iterations)
+    ilqr = POD_iLQR(C, run_vdp, state_dimension, control_dimension, alpha, horizon, init_state, final_state, n_z, q, q_u, Q, Q_final, R, 
+                nominal_init_stddev, n_sys_id_samples=50, pert_sys_id_sigma=1e-3, arma_sys_id_flag = True)
+    ilqr.iterate_ilqr(n_iterations)
 
-    #ilqr.plot_episodic_cost_history(path_to_training_cost_fig)
-    #ilqr.save_policy(path_to_policy_file)
-    #ilqr.save_cost(path_to_cost_file)
+    ilqr.plot_episodic_cost_history(path_to_training_cost_fig)
+    ilqr.save_policy(path_to_policy_file)
+    ilqr.save_cost(path_to_cost_file)
 
     # Check and Simulate the obtained policy
     #run_vdp.simulate_vdp(y_init = init_state.flatten(), u = ilqr.U.flatten(), horizon=horizon)
