@@ -89,10 +89,10 @@ class iLQR:
 
     def backward_pass(self):
         ################## defining local functions & variables for faster access ################
-        k = self.k
-        K = self.K
-        V_x = self.V_x
-        V_xx = self.V_xx
+        k = np.copy(self.k)
+        K = np.copy(self.K)
+        V_x = np.copy(self.V_x)
+        V_xx = np.copy(self.V_xx)
         ##########################################################################################
 
         V_x[self.N-1] = self.l_x_N(self.X[self.N-1])	
@@ -121,10 +121,10 @@ class iLQR:
             except np.linalg.LinAlgError:
                 print("FAILED! Q_uu is not Positive definite at t=",t)
                 backward_pass_flag = 0
-                k = self.k
-                K = self.K
-                V_x = self.V_x
-                V_xx = self.V_xx
+                k = np.copy(self.k)
+                K = np.copy(self.K)
+                V_x = np.copy(self.V_x)
+                V_xx = np.copy(self.V_xx)
 
             else:
                 backward_pass_flag = 1
@@ -140,10 +140,10 @@ class iLQR:
                     V_xx[t-1] = Q_xx + ((K[t].T) @ (Q_uu @ K[t])) + ((K[t].T) @ Q_ux) + ((Q_ux.T) @ K[t])
 
 		######################### Update the new gains ##############################################
-        self.k = k
-        self.K = K
-        self.V_x = V_x
-        self.V_xx = V_xx
+        self.k = np.copy(k)
+        self.K = np.copy(K)
+        self.V_x = np.copy(V_x)
+        self.V_xx = np.copy(V_xx)
 
         return backward_pass_flag, del_J_alpha
     
@@ -152,8 +152,8 @@ class iLQR:
         #cost before forward pass
         J1 = self.calculate_total_cost(self.X_0, self.X, self.U, self.N)
 
-        self.X_temp = self.X
-        self.U_temp = self.U
+        self.X_temp = np.copy(self.X)
+        self.U_temp = np.copy(self.U)
 
         self.forward_pass_simulate()
 
@@ -162,8 +162,8 @@ class iLQR:
 
         if (J1-J2)/del_J_alpha < self.J_change_eps:
             forward_pass_flag = 0
-            self.X = self.X_temp
-            self.U = self.U_temp
+            self.X = np.copy(self.X_temp)
+            self.U = np.copy(self.U_temp)
         else:
             forward_pass_flag = 1
 
@@ -199,20 +199,6 @@ class iLQR:
                 self.U[t] = self.U_temp[t] + self.alpha*self.k[t] + (self.K[t] @ (self.X[t-1] - self.X_temp[t-1]))
                 self.X[t] = self.model.simulate(self.X[t-1].flatten(),self.U[t].flatten()).reshape(np.shape(self.X_0))
 
-    def incremental_cost(self,x,u):
-        '''
-			Incremental cost in terms of state and controls.
-            Can be overwritten in actual working example
-		'''
-        return (((x - self.X_N).T @ self.Q) @ (x - self.X_N)) + (((u.T) @ self.R) @ u)
-	
-    def terminal_cost(self,x):
-        '''
-			Terminal cost in terms of state.
-            Can be overwritten in actual working example
-		'''
-        return (((x - self.X_N).T @ self.Q_final) @ (x - self.X_N)) 
-
     def initialize_traj(self,u_init):
         """
         Initialize the nominal trajectory with an initial guess for control
@@ -235,6 +221,20 @@ class iLQR:
         total_cost += self.terminal_cost(state_traj[horizon-1])
 
         return total_cost
+    
+    def incremental_cost(self,x,u):
+        '''
+			Incremental cost in terms of state and controls.
+            Can be overwritten in actual working example
+		'''
+        return (((x - self.X_N).T @ self.Q) @ (x - self.X_N)) + (((u.T) @ self.R) @ u)
+	
+    def terminal_cost(self,x):
+        '''
+			Terminal cost in terms of state.
+            Can be overwritten in actual working example
+		'''
+        return (((x - self.X_N).T @ self.Q_final) @ (x - self.X_N)) 
 
     def inc_reg_mu(self):
         '''increase regularization variable mu'''
