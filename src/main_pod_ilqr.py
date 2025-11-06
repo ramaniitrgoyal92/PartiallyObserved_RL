@@ -83,6 +83,7 @@ class POD_iLQR(iLQR):
         Fx_Fu = self.ltv_sys_id.traj_sys_id(np.concatenate((self.X_0.reshape(1, self.n_x, 1), self.X), axis=0), self.U)
         
         for t in range(self.N-1, -1, -1):
+        # for t in range(self.N-1, max(self.q, self.q_u)-1, -1):
             F_x = Fx_Fu[t][:,:self.n_x]
             F_u = Fx_Fu[t][:,self.n_x:]
 
@@ -92,7 +93,6 @@ class POD_iLQR(iLQR):
         # # A_aug, B_aug, V_z_F_XU_XU, traj = self.sys_id(x_0, u_nom, central_diff=1, V_x=V_x)
 
         # # for t in range(self.N-1, -1, -1):
-        # for t in range(self.N-1, max(self.q, self.q_u)-1, -1):
         #     F_x = A_aug[t]
         #     F_u = B_aug[t]
 
