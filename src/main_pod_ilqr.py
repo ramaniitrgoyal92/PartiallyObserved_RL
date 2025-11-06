@@ -22,8 +22,8 @@ class POD_iLQR(iLQR):
         # self.K = np.zeros((self.N, self.n_u, n_z*q+self.n_u*(q_u-1)))
         # self.k = np.zeros((self.N, self.n_u, 1))
 		
-        self.V_zz = np.zeros((self.N, n_z*q+self.n_u*(q_u-1), n_z*q+self.n_u*(q_u-1)))
-        self.V_z = np.zeros((self.N, n_z*q+self.n_u*(q_u-1), 1))
+        self.V_xx = np.zeros((self.N, n_z*q+self.n_u*(q_u-1), n_z*q+self.n_u*(q_u-1)))
+        self.V_x = np.zeros((self.N, n_z*q+self.n_u*(q_u-1), 1))
         
         self.ltv_sys_id = ARMA_LTV_SysID(self.model, self.n_x, n_u, n_z, C, q, q_u, self.N, n_samples=n_sys_id_samples, pert_sigma = pert_sys_id_sigma)
         
@@ -70,12 +70,12 @@ class POD_iLQR(iLQR):
         ################## defining local functions & variables for faster access ################
         k = self.k
         K = self.K
-        V_z = self.V_z
-        V_zz = self.V_zz
+        V_x = self.V_x
+        V_xx = self.V_xx
         ##########################################################################################
 
-        V_z[self.N-1] = self.l_x_N(self.X[self.N-1])	
-        V_zz[self.N-1] = 2*self.Q_final
+        V_x[self.N-1] = self.l_x_N(self.X[self.N-1])	
+        V_xx[self.N-1] = 2*self.Q_final
 
         # Initialize before forward pass
         del_J_alpha = 0
@@ -87,9 +87,9 @@ class POD_iLQR(iLQR):
             F_u = Fx_Fu[t][:,self.n_x:]
 
         # #TODO: TEST CODE
-        # # del_J_alpha, b_pass_success_flag = partials_list(self.X_p_0, self.U_p, V_z, V_zz, del_J_alpha)
+        # # del_J_alpha, b_pass_success_flag = partials_list(self.X_p_0, self.U_p, V_x, V_xx, del_J_alpha)
         # A_aug, B_aug, V_z_F_XU_XU, traj = self.ltv_sys_id.traj_sys_id_state_pertb(np.concatenate((self.X_0.reshape(1, self.n_x, 1), self.X), axis=0), self.U)
-        # # A_aug, B_aug, V_z_F_XU_XU, traj = self.sys_id(x_0, u_nom, central_diff=1, V_z=V_z)
+        # # A_aug, B_aug, V_z_F_XU_XU, traj = self.sys_id(x_0, u_nom, central_diff=1, V_x=V_x)
 
         # # for t in range(self.N-1, -1, -1):
         # for t in range(self.N-1, max(self.q, self.q_u)-1, -1):
@@ -97,9 +97,9 @@ class POD_iLQR(iLQR):
         #     F_u = B_aug[t]
 
             if t>0:
-                Q_z, Q_u, Q_zz, Q_uu, Q_uz = self.get_gradients(F_x,F_u,self.X[t-1],self.U[t],V_z[t], V_zz[t])
+                Q_z, Q_u, Q_zz, Q_uu, Q_uz = self.get_gradients(F_x,F_u,self.X[t-1],self.U[t],V_x[t], V_xx[t])
             else:
-                Q_z, Q_u, Q_zz, Q_uu, Q_uz = self.get_gradients(F_x,F_u,self.X_0,self.U[0],V_z[0], V_zz[0])
+                Q_z, Q_u, Q_zz, Q_uu, Q_uz = self.get_gradients(F_x,F_u,self.X_0,self.U[0],V_x[0], V_xx[0])
             
 
             try:
@@ -110,8 +110,8 @@ class POD_iLQR(iLQR):
                 backward_pass_flag = 0
                 k = self.k
                 K = self.K
-                V_z = self.V_z
-                V_zz = self.V_zz
+                V_x = self.V_x
+                V_xx = self.V_xx
             else:
                 backward_pass_flag = 1
                 # update gains as follows
@@ -122,14 +122,14 @@ class POD_iLQR(iLQR):
                 del_J_alpha += -self.alpha*((k[t].T) @ Q_u) - 0.5*self.alpha**2 * ((k[t].T) @ (Q_uu @ k[t]))
 				
                 if t>0:
-                    V_z[t-1] = Q_z + (K[t].T) @ (Q_uu @ k[t]) + ((K[t].T) @ Q_u) + ((Q_uz.T) @ k[t])
-                    V_zz[t-1] = Q_zz + ((K[t].T) @ (Q_uu @ K[t])) + ((K[t].T) @ Q_uz) + ((Q_uz.T) @ K[t])
+                    V_x[t-1] = Q_z + (K[t].T) @ (Q_uu @ k[t]) + ((K[t].T) @ Q_u) + ((Q_uz.T) @ k[t])
+                    V_xx[t-1] = Q_zz + ((K[t].T) @ (Q_uu @ K[t])) + ((K[t].T) @ Q_uz) + ((Q_uz.T) @ K[t])
 
 		######################### Update the new gains ##############################################
         self.k = k
         self.K = K
-        self.V_z = V_z
-        self.V_zz = V_zz
+        self.V_x = V_x
+        self.V_xx = V_xx
 
         return backward_pass_flag, del_J_alpha 
     
@@ -159,7 +159,7 @@ class POD_iLQR(iLQR):
 
         return forward_pass_flag
 
-    def get_gradients(self,F_x,F_u,x,u, V_z, V_zz):
+    def get_gradients(self,F_x,F_u,x,u, V_x, V_xx):
         """
         Compute the gradients of Q function
         F_x : (nx,nx)
@@ -171,13 +171,13 @@ class POD_iLQR(iLQR):
         returns : Q_x, Q_u, Q_xx, Q_uu, Q_
         """
         # Exactly same from iLQR, will be removed later
-        # Q_z = self.l_x(traj[:,t].reshape(self.n_x,1)) + ((F_x.T) @ V_z)
-        Q_z = self.l_x(x) + ((F_x.T) @ V_z)
-        Q_u = self.l_u(u) + ((F_u.T) @ V_z)
+        # Q_z = self.l_x(traj[:,t].reshape(self.n_x,1)) + ((F_x.T) @ V_x)
+        Q_z = self.l_x(x) + ((F_x.T) @ V_x)
+        Q_u = self.l_u(u) + ((F_u.T) @ V_x)
 
-        Q_zz = 2*self.Q + ((F_x.T) @ (V_zz @ F_x)) 
-        Q_uz = (F_u.T) @ ((V_zz + self.mu*np.eye(V_zz.shape[0])) @ F_x)
-        Q_uu = 2*self.R + (F_u.T) @ ((V_zz + self.mu*np.eye(V_zz.shape[0])) @ F_u)
+        Q_zz = 2*self.Q + ((F_x.T) @ (V_xx @ F_x)) 
+        Q_uz = (F_u.T) @ ((V_xx + self.mu*np.eye(V_xx.shape[0])) @ F_x)
+        Q_uu = 2*self.R + (F_u.T) @ ((V_xx + self.mu*np.eye(V_xx.shape[0])) @ F_u)
 
         return Q_z, Q_u, Q_zz, Q_uu, Q_uz
         
