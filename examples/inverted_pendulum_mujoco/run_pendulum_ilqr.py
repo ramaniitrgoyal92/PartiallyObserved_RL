@@ -48,7 +48,7 @@ if __name__=="__main__":
     print('Goal phase : \n', final_state)
 	
     # No. of ILQR iterations to run
-    n_iterations = 100
+    n_iterations = 50
 
     # Create model instance
     run_pendulum = RunPendulum(state_dimension, control_dimension, dt, MODEL)
@@ -64,12 +64,5 @@ if __name__=="__main__":
     ilqr.save_cost(path_to_cost_file)
 
     # Check and Simulate the obtained policy
-    # print
     run_pendulum.simulate_pendulum(y_init = init_state.flatten(), u = ilqr.U.flatten(), horizon=horizon)
     run_pendulum.draw_figure(path_to_traj_fig)
-
-    # Test sys_id
-    '''x_t = np.array([2.0,0.0]).reshape(state_dimension,1)
-    u_t = np.array([0]).reshape(control_dimension,1)
-    AB = model.sys_id(x_t,u_t)
-    print(AB)'''

@@ -154,8 +154,8 @@ if __name__ == '__main__':
     file_loc = cwd / "examples/inverted_pendulum_mujoco"
     file_loc.mkdir(parents=True, exist_ok=True)
     
-    model_path = file_loc / "pendulum.xml"
-    save_path = file_loc / "pendulum_trajectory.png"
+    model_path = file_loc / "models/pendulum.xml"
+    save_path = file_loc / "models/pendulum_trajectory.png"
     
     # CartPole parameters
     nx, nu, dt = 2, 1, 0.1
