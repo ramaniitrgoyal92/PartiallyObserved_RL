@@ -106,7 +106,7 @@ class SimulateCar:
         
         return states
     
-    def simulate(self, x_init, u_input):
+    def simulate_car(self, x_init, u_input):
         """
         Single step simulation (for iLQR compatibility)
         
@@ -131,7 +131,7 @@ class SimulateCar:
         
         return next_state
     
-    def simulate_car(self, state_init=np.array([0.0, 0.0, 0.0, 0.0]), 
+    def simulate_trajectory(self, state_init=np.array([0.0, 0.0, 0.0, 0.0]), 
                      u=None, horizon=1, n_per_step=1):
         """
         Simulate Car trajectory

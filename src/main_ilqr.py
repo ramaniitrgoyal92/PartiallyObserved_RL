@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import json
-# np.random.seed(42)
+np.random.seed(42)
 from progressbar import *
 
 class iLQR:
@@ -56,7 +56,7 @@ class iLQR:
         '''
 			Main function that carries out the algorithm at higher level
             n_iter : Number of iLQR iterations to run
-            u_init : Initial guess for control trajectory         
+            u_init : Initial guess for control trajectory  (N, n_u, 1)        
 		'''
 
 		# Initialize the trajectory with the desired initial guess

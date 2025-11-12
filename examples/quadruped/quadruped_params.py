@@ -38,7 +38,7 @@ R = 0.001*np.eye(control_dimension)
 # Number of substeps in simulation
 ctrl_state_freq_ratio = 1
 dt = 0.01
-horizon = 100 
+horizon = 100
 nominal_init_stddev = 0.1
 
 alpha = 1

@@ -160,6 +160,46 @@ class SimulateGo2:
         
         return self.Y
     
+   
+    def simulate_trajectory_PID(self, y_init=None, u=None, horizon=1,KP=50.0, KD=1.0):
+        """
+        Simulate Go2 trajectory
+        
+        Args:
+            y_init: Initial state [37] or None for default standing
+            u: Control sequence [horizon x 12]
+            horizon: Number of timesteps
+        
+        Returns:
+            Y: State trajectory [horizon+1 x 37]
+        """
+        if u is None:
+            u = np.zeros((horizon, self.nu))
+        
+        if u.shape[0] != horizon:
+            u = np.zeros((horizon, self.nu))
+        
+        # Reset to initial state
+        self.reset(y_init)
+        
+        # Storage
+        self.T = np.arange(horizon + 1) * self.dt
+        self.Y = np.zeros((horizon + 1, self.nx))
+        self.U = u
+        
+        # Store initial state
+        self.Y[0, :] = self.get_state()
+        
+        u = np.concatenate((u, np.zeros((1,self.nu))), axis=0)  # Extra step for last control
+        # Simulate forward
+        for i in range(horizon):
+            state = self.step(u[i])
+            self.Y[i + 1, :] = state
+            u[i+1] = KP * (q_des - state[7:19]) + KD * (0.0 - state[25:37])
+
+        self.U = u[0:horizon,:]
+        return self.Y
+    
     def draw_figure(self, save_to_path=None):
         """Plot trajectory results"""
         fig = plt.figure(figsize=(16, 12))
@@ -277,22 +317,10 @@ if __name__ == '__main__':
     nx, nu, dt = 37, 12, 0.01  # 37 states, 12 controls, 10ms timestep
     
     # Time horizon
-    time_horizon = 100
-    
-    # Test control: small sinusoidal torques on all joints
-    # control = np.zeros((time_horizon, nu))
-    # for i in range(nu):
-    #         control[:, i] = 1.0 * np.sin(np.linspace(0, 2*np.pi, time_horizon) + i*np.pi/6)
-
-    # Positional values to keep it standing
-    # control = np.tile(np.array([0., 0.9, -1.8, 0., 0.9, -1.8, 0., 0.9, -1.8, 0., 0.9, -1.8]), (time_horizon, 1))
-
-    # Torque Values found from PID to keep it standing
-    control = np.tile(np.array([
-                -2.03926889,  0.59256921,  5.88984517,  2.03927658,  0.59256386,  5.88986376,
-                -2.18573907,  0.55455663,  6.24895975,  2.18573223,  0.55455287,  6.24893569
-                ]), (time_horizon, 1))
-    
+    time_horizon = 1000  # 10 seconds
+   
+    # position actuators (XML currently uses <position> actuators)
+    # control = np.tile(np.array([0, 0.9, -1.8, 0, 0.9, -1.8, 0, 0.9, -1.8, 0, 0.9, -1.8]), (time_horizon,1))
     
     print('='*70)
     print('UNITREE GO2 MUJOCO SIMULATION')
@@ -306,12 +334,21 @@ if __name__ == '__main__':
     # Create MuJoCo simulator
     sim = SimulateGo2(nx, nu, dt, model_path=str(model_path))
     
-    # Run simulation from default standing pose
-    trajectory = sim.simulate_trajectory(
+    # Desired joint positions (rad) for 12 joints (FL, FR, RL, RR: Hip, Thigh, Calf)
+    q_des = np.array([0., 0.9, -1.8, 0., 0.9, -1.8, 0., 0.9, -1.8, 0., 0.9, -1.8])
+
+    # PD gains (for mapping desired positions -> torques)
+    KP = 200
+    KD = 1.0
+
+    control = np.zeros((time_horizon, nu))
+
+    # Run simulation from default standing pose with PID control
+    trajectory = sim.simulate_trajectory_PID(
         y_init=None,  # Use default standing pose
         u=control,
-        horizon=time_horizon
-    )
+        horizon=time_horizon,
+        KP=KP, KD=KD)
     
     # Print final state summary
     final_state = trajectory[-1]
@@ -319,6 +356,7 @@ if __name__ == '__main__':
     print(f'Base position: [{final_state[0]:.3f}, {final_state[1]:.3f}, {final_state[2]:.3f}] m')
     print(f'Base height: {final_state[2]:.3f} m')
     print(f'Base velocity: {np.linalg.norm(final_state[19:22]):.3f} m/s')
+    print(f'Final joint torques: {sim.U[-1]} Nm')
     print('='*70 + '\n')
     
     # Draw figure

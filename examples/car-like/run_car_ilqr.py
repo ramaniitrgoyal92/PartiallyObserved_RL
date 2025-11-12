@@ -25,7 +25,7 @@ class RunCar(SimulateCar):
         SimulateCar.__init__(self, state_dimension, control_dimension, dt)
 
     def simulate(self,x,u):
-        return self.simulate_car(x, u)[-1]
+        return self.simulate_car(x, u)
 
 class RunCarNoisy(SimulateCar):
     """CartPole with additive control noise"""
@@ -40,7 +40,7 @@ class RunCarNoisy(SimulateCar):
             u_noisy = u + self.noise_epsilon * 1.0 * noise
         else:
             u_noisy = u
-        return self.simulate_car(x, u_noisy)[-1]
+        return self.simulate_car(x, u_noisy)
 
 if __name__=="__main__":
 
@@ -85,7 +85,7 @@ if __name__=="__main__":
     # run_car.draw_figure(path_to_traj_fig)
 
     print(ilqr.U)
-    run_car.simulate_car(state_init = init_state.flatten(), u = ilqr.U.reshape((horizon,control_dimension)), horizon=horizon)
+    run_car.simulate_trajectory(state_init = init_state.flatten(), u = ilqr.U.reshape((horizon,control_dimension)), horizon=horizon)
     run_car.draw_figure(path_to_traj_fig)
 
     # Test sys_id

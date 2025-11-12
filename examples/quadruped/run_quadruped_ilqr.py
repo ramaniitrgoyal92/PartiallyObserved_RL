@@ -25,14 +25,14 @@ class RunGo2(SimulateGo2):
         SimulateGo2.__init__(self, state_dimension, control_dimension, dt, model_path=str(model_path))
 
     def simulate(self,x,u):
-        return self.simulate_trajectory(x, u)[-1]
+        return self.simulate_quadruped(x, u)
 
 
 if __name__=="__main__":
 
     cwd = os.getcwd()
     path_to_quadruped = Path(cwd)/"examples/quadruped"
-    MODEL = path_to_quadruped/"models/go2.xml"
+    MODEL = path_to_quadruped/"models/scene.xml"
 
     path_to_export = path_to_quadruped/"Quadruped_Experiments/exp_1"
     path_to_policy_file = path_to_export/"quadruped_policy.txt"
@@ -53,6 +53,10 @@ if __name__=="__main__":
     # Create model instance
     run_go2 = RunGo2(state_dimension, control_dimension, dt, MODEL)
 
+    u_init = np.tile(np.array([
+                -2.03926889,  0.59256921,  5.88984517,  2.03927658,  0.59256386,  5.88986376,
+                -2.18573907,  0.55455663,  6.24895975,  2.18573223,  0.55455287,  6.24893569
+                ]), (horizon, 1)).reshape((horizon, control_dimension, 1))
     
 
     print('Initial phase : \n', init_state)
@@ -61,7 +65,7 @@ if __name__=="__main__":
     # Create iLQR instance
     ilqr = iLQR(run_go2, state_dimension, control_dimension, alpha, horizon, init_state, final_state, Q, Q_final, R, 
                 nominal_init_stddev, n_sys_id_samples=2000, pert_sys_id_sigma=1e-5, arma_sys_id_flag = False)
-    ilqr.iterate_ilqr(n_iterations)
+    ilqr.iterate_ilqr(n_iterations,u_init=u_init)
 
 
     ilqr.plot_episodic_cost_history(path_to_training_cost_fig)
@@ -69,8 +73,7 @@ if __name__=="__main__":
     ilqr.save_cost(path_to_cost_file)
 
     # Check and Simulate the obtained policy
-    # print
-    run_go2.simulate_trajectory(y_init = init_state.flatten(), u = ilqr.U.flatten(), horizon=horizon)
+    run_go2.simulate_trajectory(y_init = init_state.flatten(), u = ilqr.U.reshape(horizon,control_dimension), horizon=horizon)
     run_go2.draw_figure(path_to_traj_fig)
 
     # Test sys_id
