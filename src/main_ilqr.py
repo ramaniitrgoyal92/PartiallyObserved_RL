@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import json
-np.random.seed(42)
+# np.random.seed(42)
 from progressbar import *
 
 class iLQR:

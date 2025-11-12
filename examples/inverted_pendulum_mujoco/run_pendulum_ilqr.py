@@ -48,14 +48,14 @@ if __name__=="__main__":
     print('Goal phase : \n', final_state)
 	
     # No. of ILQR iterations to run
-    n_iterations = 100
+    n_iterations = 50
 
     # Create model instance
     run_pendulum = RunPendulum(state_dimension, control_dimension, dt, MODEL)
 
     # Create iLQR instance
     ilqr = iLQR(run_pendulum, state_dimension, control_dimension, alpha, horizon, init_state, final_state, Q, Q_final, R, 
-                nominal_init_stddev, n_sys_id_samples=50, pert_sys_id_sigma=1e-7, arma_sys_id_flag = False)
+                nominal_init_stddev, n_sys_id_samples=50, pert_sys_id_sigma=1e-1, arma_sys_id_flag = True)
     ilqr.iterate_ilqr(n_iterations)
 
 
