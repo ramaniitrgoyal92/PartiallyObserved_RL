@@ -42,10 +42,11 @@ class ARMA_LTV_SysID(LTV_SysID):
         U_pertb = U_pertb.reshape((self.N+1)*self.n_u, self.n_samples).T
         delta_z = np.zeros((self.n_samples, self.n_z*(N+1)))
         
+        
         # Generating delta_z for all rollouts
         for j in range(self.n_samples):
             for i in range(N):
-                delta_z[j, n_z*(N-i-1):n_z*(N-i)] = Z[i+1,:,j] - Z_nom[i+1,0] 
+                delta_z[j, n_z*(N-i-1):n_z*(N-i)] = Z[i+1,:,j] - Z_nom[i+1,:,0]
         
         return self.arma_fit(delta_z, U_pertb)
     
