@@ -48,7 +48,7 @@ if __name__=="__main__":
     # final_state[0] = 2.0
 
     # No. of ILQR iterations to run
-    n_iterations = 5
+    n_iterations = 10
 
     # Create model instance
     run_go2 = RunGo2(state_dimension, control_dimension, dt, MODEL)
@@ -64,8 +64,8 @@ if __name__=="__main__":
 
     # Create iLQR instance
     ilqr = iLQR(run_go2, state_dimension, control_dimension, alpha, horizon, init_state, final_state, Q, Q_final, R, 
-                nominal_init_stddev, n_sys_id_samples=2000, pert_sys_id_sigma=1e-5, arma_sys_id_flag = False)
-    ilqr.iterate_ilqr(n_iterations,u_init=u_init)
+                nominal_init_stddev, n_sys_id_samples=2000, pert_sys_id_sigma=1e-3, arma_sys_id_flag = False)
+    ilqr.iterate_ilqr(n_iterations)
 
 
     ilqr.plot_episodic_cost_history(path_to_training_cost_fig)
