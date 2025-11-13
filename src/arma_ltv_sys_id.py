@@ -39,40 +39,39 @@ class ARMA_LTV_SysID(LTV_SysID):
         # Generating perturbations
         X_pertb, U_pertb = self.generate_rollouts(x_nom, u_nom)
         Z = self.C @ X_pertb #TODO : (N+1,nx,n_samples) -> (N+1,nz,n_samples)
-        U_pertb = U_pertb.reshape((self.N+1)*self.n_u, self.n_samples).T
-        delta_z = np.zeros((self.n_samples, self.n_z*(N+1)))
         
+        # # Generating delta_z for all rollouts
+        delta_Z = np.zeros((N+1, n_z, self.n_samples))
+        for i in range(N+1):
+            delta_Z[i, :, :] = Z[i, :, :] - Z_nom[i, :, 0:1]
         
-        # Generating delta_z for all rollouts
-        for j in range(self.n_samples):
-            for i in range(N):
-                delta_z[j, n_z*(N-i-1):n_z*(N-i)] = Z[i+1,:,j] - Z_nom[i+1,:,0]
+        delta_Z = delta_Z.transpose(2, 1, 0)  # (n_samples, n_z, N+1)
+        U_pertb = U_pertb.transpose(2, 1, 0)  # (n_samples, n_u, N+1)
         
-        return self.arma_fit(delta_z, U_pertb)
+        return self.arma_fit(delta_Z, U_pertb)
     
-    def arma_fit(self, delta_z, U_pertb):
-        """
-        ARMA LTV fitting with A_aug and B_aug construction
-        delta_z : (n_samples, n_z*(N+1))
-        U_pertb : (n_samples, n_u*(N+1))
-        returns : AB_aug : (N, n_z*q + n_u*(q_u-1), n_z*q + n_u*q_u)
-        """
-        ################## defining local functions & variables for faster access ################
-        n_z, n_u, q, q_u, N, n_samples = self.n_z, self.n_u, self.q, self.q_u, self.N, self.n_samples
-        ##########################################################################################
 
-        fitcoef = np.zeros((n_z, n_z*q + n_u*q_u, N))
-    
-        # Handle edge case: when q_u=1, there's no control history to store
-        aug_dim = n_z*q + n_u*max(0, q_u-1)  # Ensure non-negative dimension
+    def arma_fit(self, delta_Z, U_pertb):
+        """
+        ARMA LTV fitting with forward time indexing
+        delta_Z : (n_samples, n_z, N+1)
+        U_pertb : (n_samples, n_u, N+1)
+        returns : AB_aug : (N, aug_dim, aug_dim + n_u)
+        """
+        n_z, n_u, q, q_u, N, n_samples = self.n_z, self.n_u, self.q, self.q_u, self.N, self.n_samples
+        
+        # Augmented state dimension
+        aug_dim = n_z*q + n_u*max(0, q_u-1)
+        
+        # Output arrays
         A_aug = np.zeros((N, aug_dim, aug_dim))
         B_aug = np.zeros((N, aug_dim, n_u))
         
-        # Pre-allocate reusable arrays
-        M1 = np.zeros((n_samples, n_z*q + n_u*q_u))
-        delta = np.zeros((n_samples, n_z))
+        # Pre-allocate regressor arrays
+        M = np.zeros((n_samples, n_z*q + n_u*q_u))
+        target = np.zeros((n_samples, n_z))
         
-        # Pre-compute constant blocks - handle edge cases
+        # Pre-compute constant shifting blocks
         state_shift_block = None
         if q > 1:
             state_eye = np.eye(n_z*(q-1))
@@ -83,10 +82,8 @@ class ARMA_LTV_SysID(LTV_SysID):
         if q_u > 2:
             ctrl_eye = np.eye(n_u*(q_u-2))
         
-        # B_aug constant blocks - handle edge cases
-        b_state_zeros = np.zeros((n_z*max(0, q-1), n_u))  # Handle q=1 case
+        b_state_zeros = np.zeros((n_z*max(0, q-1), n_u))
         
-        # Handle control history blocks
         if q_u > 1:
             b_ctrl_eye = np.eye(n_u)
             if q_u > 2:
@@ -95,68 +92,70 @@ class ARMA_LTV_SysID(LTV_SysID):
             else:
                 b_ctrl_block = b_ctrl_eye
         else:
-            # q_u = 1: no control history to store
-            b_ctrl_block = np.zeros((0, n_u))  # Empty block
+            b_ctrl_block = np.zeros((0, n_u))
         
-        # Main loop
-        for i in range(max(q, q_u), N):
-            # Build regressors - same as before
-            M1[:, :n_z*q] = delta_z[:, n_z*(N-i):n_z*(N-i+q)]
-            M1[:, n_z*q:] = U_pertb[:, n_u*(N-i):n_u*(N-i+q_u)]
-            delta[:, :] = delta_z[:, n_z*(N-i-1):n_z*(N-i)]
+        # Main loop - forward in time
+        start_idx = max(q, q_u)
+        
+        for t in range(start_idx, N+1):
+            # Build regressor: [δz[t-q], ..., δz[t-1], δu[t-q_u], ..., δu[t-1]]
+            for i in range(q):
+                M[:, i*n_z:(i+1)*n_z] = delta_Z[:, :, t-q+i]
+            
+            for i in range(q_u):
+                M[:, q*n_z + i*n_u : q*n_z + (i+1)*n_u] = U_pertb[:, :, t-q_u+i]
+            
+            # Target: δz[t]
+            target[:, :] = delta_Z[:, :, t]
             
             # Solve least squares
-            mat, res, rank, S = np.linalg.lstsq(M1, delta, rcond=None)
-            fitcoef[:, :, i] = mat.T
+            fitcoef, _, _, _ = np.linalg.lstsq(M, target, rcond=None)
+            fitcoef = fitcoef.T  # (n_z, n_z*q + n_u*q_u)
             
-            # === A_aug construction with edge case handling ===
+            # Store at output index (t-1)
+            out_idx = t - 1
             
-            # Top row: ARMA coefficients
+            # === A_aug construction ===
+            # Top row: [α_{t-1,1}, ..., α_{t-1,q}, β_{t-1,2}, ..., β_{t-1,q_u}]
             if q_u > 1:
-                # Standard case: include control history terms
-                A_aug[i, :n_z, :] = np.hstack((fitcoef[:, :n_z*q, i], fitcoef[:, n_z*q+n_u:, i]))
+                # Include state history and control history (excluding current control)
+                A_aug[out_idx, :n_z, :n_z*q] = fitcoef[:, :n_z*q]
+                A_aug[out_idx, :n_z, n_z*q:] = fitcoef[:, n_z*q+n_u:]
             else:
-                # q_u=1 case: only state terms (no control history)
-                A_aug[i, :n_z, :n_z*q] = fitcoef[:, :n_z*q, i]
-                # No control history terms to add
+                # q_u=1: only state history (no control history to store)
+                A_aug[out_idx, :n_z, :n_z*q] = fitcoef[:, :n_z*q]
             
-            # State shifting block (only if q > 1)
+            # State shifting block: [I_{n_z*(q-1)}, 0]
             if q > 1 and state_shift_block is not None:
-                A_aug[i, n_z:n_z+n_z*(q-1), :] = state_shift_block
+                A_aug[out_idx, n_z:n_z*q, :] = state_shift_block
             
-            # Zero out remaining sections if they exist
-            if aug_dim > n_z + n_z*max(0, q-1):
-                A_aug[i, n_z+n_z*max(0, q-1):, :] = 0
-            
-            # Control shifting (only if q_u > 2)
+            # Control shifting block (only if q_u > 2)
             if q_u > 2 and ctrl_eye is not None:
-                row_start = n_z + n_z*max(0, q-1) + n_u
-                col_start = n_z*q + 1
+                row_start = n_z*q + n_u
+                col_start = n_z*q + n_u
                 row_end = row_start + n_u*(q_u-2)
                 col_end = col_start + n_u*(q_u-2)
                 
-                # Check bounds to avoid indexing errors
                 if row_end <= aug_dim and col_end <= aug_dim:
-                    A_aug[i, row_start:row_end, col_start:col_end] = ctrl_eye
+                    A_aug[out_idx, row_start:row_end, col_start:col_end] = ctrl_eye
             
-            # === B_aug construction with edge case handling ===
+            # === B_aug construction ===
+            # Top part: [β_{t-1,1}; 0; ...; 0] (current control + zeros for state history)
+            if q > 1:
+                B_aug[out_idx, :n_z*q, :] = np.vstack([
+                    fitcoef[:, n_z*q:n_z*q+n_u],  # Current control coefficient
+                    b_state_zeros                  # Zeros for state history slots
+                ])
+            else:
+                # q=1: just the current control coefficient
+                B_aug[out_idx, :n_z, :] = fitcoef[:, n_z*q:n_z*q+n_u]
             
-            # Top part: current control and state history zeros
-            top_rows = n_z + n_z*max(0, q-1)
-            if top_rows > 0:
-                if q > 1:
-                    B_aug[i, :top_rows, :] = np.vstack([fitcoef[:, n_z*q:n_z*q+n_u, i], b_state_zeros])
-                else:
-                    # q=1 case: only current control, no state history
-                    B_aug[i, :n_z, :] = fitcoef[:, n_z*q:n_z*q+n_u, i]
-            
-            # Bottom part: control history storage (only if q_u > 1)
-            if q_u > 1 and top_rows < aug_dim:
-                remaining_rows = aug_dim - top_rows
-                if remaining_rows > 0 and b_ctrl_block.shape[0] > 0:
-                    # Make sure dimensions match
-                    rows_to_fill = min(remaining_rows, b_ctrl_block.shape[0])
-                    B_aug[i, top_rows:top_rows+rows_to_fill, :] = b_ctrl_block[:rows_to_fill, :]
+            # Bottom part: control history storage [I_{n_u}; 0; ...; 0] (only if q_u > 1)
+            if q_u > 1 and n_z*q < aug_dim:
+                rows_to_fill = min(aug_dim - n_z*q, b_ctrl_block.shape[0])
+                B_aug[out_idx, n_z*q:n_z*q+rows_to_fill, :] = b_ctrl_block[:rows_to_fill, :]
         
+        # Concatenate A_aug and B_aug
         AB_aug = np.concatenate((A_aug, B_aug), axis=2)
+        
         return AB_aug
