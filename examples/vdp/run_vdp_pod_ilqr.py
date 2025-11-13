@@ -27,8 +27,8 @@ class RunVdp(SimulateVDP):
         SimulateVDP.__init__(self, mu, state_dimension, control_dimension, dt)
         self.C = C
 
-    def simulate(self,x,u):
-        return self.C @ self.simulate_vdp(x, u)[-1]
+    def simulate_step(self,x,u):
+        return self.C @ self.simulate_trajectory(x, u)[-1]
 
 
 if __name__=="__main__":
@@ -45,16 +45,16 @@ if __name__=="__main__":
     # path_to_data = path_to_export / "vdp_D2C_data.txt"
 
     init_state = np.zeros((state_dimension,1))
-    init_state[0] = .02
+    init_state[0] = .2
     final_state = np.zeros((state_dimension, 1))
 
     print('Initial phase : \n', init_state)
     print('Goal phase : \n', final_state)
 	
     # No. of ILQR iterations to run
-    n_iterations = 60
-    C = np.array([1.0, 0])
-    # C = np.eye(2)
+    n_iterations = 10
+    # C = np.array([1.0, 0])
+    C = np.eye(2)
     n_z = C.shape[0]
 
     # Create model instance
@@ -62,7 +62,7 @@ if __name__=="__main__":
 
     # Create iLQR instance
     ilqr = POD_iLQR(C, run_vdp, control_dimension, alpha, horizon, init_state, final_state, n_z, q, q_u, Q, Q_final, R, 
-                nominal_init_stddev, n_sys_id_samples=50, pert_sys_id_sigma=1e-3, arma_sys_id_flag = True)
+                nominal_init_stddev, n_sys_id_samples=100, pert_sys_id_sigma=1e-5, arma_sys_id_flag = True)
     ilqr.iterate_ilqr(n_iterations)
 
     ilqr.plot_episodic_cost_history(path_to_training_cost_fig)
@@ -70,8 +70,8 @@ if __name__=="__main__":
     ilqr.save_cost(path_to_cost_file)
 
     # Check and Simulate the obtained policy
-    #run_vdp.simulate_vdp(y_init = init_state.flatten(), u = ilqr.U.flatten(), horizon=horizon)
-    #run_vdp.draw_figure(path_to_traj_fig)
+    run_vdp.simulate_trajectory(y_init = init_state.flatten(), u = ilqr.U.flatten(), horizon=horizon)
+    run_vdp.draw_figure(path_to_traj_fig)
 
     # Test sys_id
     # arma_ltv_sysid = ARMA_LTV_SysID(run_vdp, state_dimension, control_dimension, n_z, C, q, q_u, horizon, n_samples=500, pert_sigma = 1e-3)

@@ -150,17 +150,20 @@ class SimulateCar:
         
         if u.shape[0] != horizon:
             u = np.zeros((horizon, 2))
-        
-        total_steps = horizon * n_per_step
-        self.T = np.linspace(0, horizon * self.dt, total_steps)
+
+        total_steps = (horizon + 1)
+        self.T = np.linspace(0, (horizon + 1) * self.dt, total_steps)
         self.Y = np.zeros((total_steps, self.nx))
         self.U = u
-        
+
+        # Store initial state
+        self.Y[0, :] = state_init
+                
         state = state_init.copy()
         
         for i in range(horizon):
             states = self.onestep_rk4(state, n_per_step, u[i])
-            self.Y[n_per_step*i:n_per_step*(i+1), :] = states
+            self.Y[i+1, :] = states[-1]
             state = states[-1]
         
         return self.Y
@@ -310,7 +313,7 @@ if __name__ == '__main__':
     sim = SimulateCar(nx, nu, dt)
     
     # Run simulation
-    trajectory = sim.simulate_car(
+    trajectory = sim.simulate_trajectory(
         state_init=state_init,
         u=control,
         horizon=time_horizon,

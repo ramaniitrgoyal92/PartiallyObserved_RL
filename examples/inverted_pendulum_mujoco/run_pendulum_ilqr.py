@@ -24,8 +24,8 @@ class RunPendulum(SimulatePendulum):
     def __init__(self, state_dimension, control_dimension, dt, model_path=None):
         SimulatePendulum.__init__(self, state_dimension, control_dimension, dt, model_path=str(model_path))
 
-    def simulate(self,x,u):
-        return self.simulate_pendulum(x, u)[-1]
+    def simulate_step(self,x,u):
+        return self.simulate_trajectory(x, u)[-1]
 
 
 if __name__=="__main__":
@@ -64,5 +64,5 @@ if __name__=="__main__":
     ilqr.save_cost(path_to_cost_file)
 
     # Check and Simulate the obtained policy
-    run_pendulum.simulate_pendulum(y_init = init_state.flatten(), u = ilqr.U.flatten(), horizon=horizon)
+    run_pendulum.simulate_trajectory(y_init = init_state.flatten(), u = ilqr.U.flatten(), horizon=horizon)
     run_pendulum.draw_figure(path_to_traj_fig)

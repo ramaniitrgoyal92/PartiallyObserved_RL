@@ -48,15 +48,21 @@ class SimulateVDP:
             y[i,:] = np.array([y1, y2])
         return y
 
-    def simulate_vdp(self, y_init = np.array([2.0,0.0]), u = np.array([0.0]), horizon=1, n_per_step = 20):
+    def simulate_trajectory(self, y_init = np.array([2.0,0.0]), u = np.array([0.0]), horizon=1, n_per_step = 20):
         if u.shape[0] !=horizon:
             u = np.zeros([horizon])
-        total_steps = horizon*n_per_step
-        self.T = np.linspace(0, horizon, total_steps)
-        self.Y = np.zeros((total_steps,self.nx))
+        u = u.flatten()
+
+        total_steps = (horizon + 1)
+        self.T = np.linspace(0, (horizon + 1) * self.dt, total_steps)
+        self.Y = np.zeros((total_steps, self.nx))
+        
+        # Store initial state
+        self.Y[0, :] = y_init
+
         for i in range(horizon):
             y = self.onestep_rk4(y_init, n_per_step, u[i])
-            self.Y[n_per_step*i:n_per_step*(i+1), :] = y
+            self.Y[i+1, :] = y[-1]
             y_init = y[-1]
         return self.Y
     
@@ -94,7 +100,7 @@ if __name__ == '__main__':
     # control = np.zeros((time_horizon))
 
     sim_module = SimulateVDP(mu, nx, nu, dt)
-    sim_module.simulate_vdp(u=control, horizon=time_horizon)
+    sim_module.simulate_trajectory(u=control, horizon=time_horizon)
     # sim_module.simulate_vdp(y_init, control)
     sim_module.draw_figure()
 

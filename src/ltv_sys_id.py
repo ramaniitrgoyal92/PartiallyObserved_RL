@@ -45,7 +45,7 @@ class LTV_SysID:
         '''
         X_next = np.zeros((X.shape[0], self.n_x))
         for i in range(X.shape[0]):
-            X_next[i,:] = self.model.simulate(X[i],U[i])
+            X_next[i,:] = self.model.simulate_step(X[i],U[i])
 
         return X_next
 
@@ -83,6 +83,28 @@ class LTV_SysID:
                            
         return np.array(traj_AB)
     
+    # def generate_rollouts(self, x_nom, u_nom):
+    #     """
+    #     Generate rollouts around nominal trajectory using control perturbations
+    #     x_nom : (N+1, n_x, 1)
+    #     u_nom : (N, n_u, 1)
+    #     returns : X_pertb : (N+1, n_x, n_samples)
+    #               U_pertb : (N, n_u, n_samples)
+    #     """
+    #     # Taking control perturbations as a function of max control
+    #     u_max = np.max(abs(u_nom))
+    #     U_pertb = self.sigma*u_max*np.random.normal(0, 1, (self.N, self.n_u, self.n_samples))
+    #     X_pertb = np.zeros((self.N+1, self.n_x, self.n_samples))
+    #     ctrl = np.zeros((self.n_u, 1))
+
+    #     for j in range(self.n_samples): # parallelize this loop
+    #         X_pertb[0, :, j] = x_nom[0].flatten()
+    #         for i in range(self.N):
+    #             ctrl[:] = u_nom[i] + U_pertb[i,:,j].reshape(np.shape(u_nom[i]))
+    #             X_pertb[i+1, :, j] = self.model.simulate_step(X_pertb[i, :, j], ctrl.flatten()).flatten()
+
+    #     return X_pertb, U_pertb
+
     def generate_rollouts(self, x_nom, u_nom):
         """
         Generate rollouts around nominal trajectory using control perturbations
@@ -93,14 +115,11 @@ class LTV_SysID:
         """
         # Taking control perturbations as a function of max control
         u_max = np.max(abs(u_nom))
-        U_pertb = self.sigma*u_max*np.random.normal(0, 1, (self.N+1, self.n_u, self.n_samples))
+        U_pertb = self.sigma*u_max*np.random.normal(0, 1, (self.N, self.n_u, self.n_samples))
+        ctrl = u_nom + U_pertb
         X_pertb = np.zeros((self.N+1, self.n_x, self.n_samples))
-        ctrl = np.zeros((self.n_u, 1))
 
-        for j in range(self.n_samples):
-            X_pertb[0, :, j] = x_nom[0].flatten()
-            for i in range(self.N):
-                ctrl[:] = u_nom[i] + U_pertb[i,:,j].reshape(np.shape(u_nom[i]))
-                X_pertb[i+1, :, j] = self.model.simulate(X_pertb[i, :, j], ctrl.flatten()).flatten()
-
+        for j in range(self.n_samples): # parallelize this loop
+            X_pertb[:,:,j] = self.model.simulate_trajectory(x_nom[0].flatten(), ctrl[:,:,j].reshape(self.N,self.n_u), horizon=self.N)
+ 
         return X_pertb, U_pertb

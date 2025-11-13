@@ -24,8 +24,9 @@ class RunGo2(SimulateGo2):
     def __init__(self, state_dimension, control_dimension, dt, model_path=None):
         SimulateGo2.__init__(self, state_dimension, control_dimension, dt, model_path=str(model_path))
 
-    def simulate(self,x,u):
+    def simulate_step(self,x,u):
         return self.simulate_quadruped(x, u)
+        # return self.simulate_trajectory(x,u.reshape(1,self.nu))[-1]
 
 
 if __name__=="__main__":
@@ -64,8 +65,8 @@ if __name__=="__main__":
 
     # Create iLQR instance
     ilqr = iLQR(run_go2, state_dimension, control_dimension, alpha, horizon, init_state, final_state, Q, Q_final, R, 
-                nominal_init_stddev, n_sys_id_samples=2000, pert_sys_id_sigma=1e-3, arma_sys_id_flag = False)
-    ilqr.iterate_ilqr(n_iterations)
+                nominal_init_stddev, n_sys_id_samples=100, pert_sys_id_sigma=1e-2, arma_sys_id_flag = True)
+    ilqr.iterate_ilqr(n_iterations,u_init=u_init)
 
 
     ilqr.plot_episodic_cost_history(path_to_training_cost_fig)

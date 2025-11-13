@@ -24,8 +24,8 @@ class RunCar(SimulateCar):
     def __init__(self, state_dimension, control_dimension, dt):
         SimulateCar.__init__(self, state_dimension, control_dimension, dt)
 
-    def simulate(self,x,u):
-        return self.simulate_car(x, u)
+    def simulate_step(self,x,u):
+        return self.simulate_trajectory(x, u.reshape((1, self.nu)))[-1]
 
 class RunCarNoisy(SimulateCar):
     """CartPole with additive control noise"""
@@ -40,7 +40,7 @@ class RunCarNoisy(SimulateCar):
             u_noisy = u + self.noise_epsilon * 1.0 * noise
         else:
             u_noisy = u
-        return self.simulate_car(x, u_noisy)
+        return self.simulate_trajectory(x, u_noisy.reshape((1, self.nu)))[-1]
 
 if __name__=="__main__":
 
@@ -70,7 +70,7 @@ if __name__=="__main__":
     u1 = np.load('examples/car-like/u_test.npy').T
     # Create iLQR instance
     ilqr = iLQR(run_car, state_dimension, control_dimension, alpha, horizon, init_state, final_state, Q, Q_final, R, 
-                nominal_init_stddev, n_sys_id_samples=30, pert_sys_id_sigma=1e-7, arma_sys_id_flag = False)
+                nominal_init_stddev, n_sys_id_samples=30, pert_sys_id_sigma=1e-7, arma_sys_id_flag = True)
     ilqr.iterate_ilqr(n_iterations)
 
     # print(ilqr.episodic_cost_history)

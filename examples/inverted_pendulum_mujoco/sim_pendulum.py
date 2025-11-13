@@ -74,7 +74,7 @@ class SimulatePendulum:
         
         return self.get_state()
     
-    def simulate_pendulum(self, y_init=np.array([np.pi, 0.0]), 
+    def simulate_trajectory(self, y_init=np.array([np.pi, 0.0]), 
                           u=np.array([0.0]), horizon=1):
         """
         Simulate CartPole trajectory
@@ -184,7 +184,7 @@ if __name__ == '__main__':
     sim = SimulatePendulum(nx, nu, dt, model_path=str(model_path))
     
     # Run simulation
-    trajectory = sim.simulate_pendulum(
+    trajectory = sim.simulate_trajectory(
         y_init=y_init,
         u=control,
         horizon=time_horizon

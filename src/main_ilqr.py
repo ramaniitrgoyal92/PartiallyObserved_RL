@@ -88,6 +88,11 @@ class iLQR:
 
 
     def backward_pass(self):
+        """
+        Carry out the backward pass to compute the feedforward and feedback gains
+        returns : backward_pass_flag : indicates if backward pass was successful
+                  del_J_alpha : expected cost reduction
+        """
         ################## defining local functions & variables for faster access ################
         k = np.copy(self.k)
         K = np.copy(self.K)
@@ -126,7 +131,7 @@ class iLQR:
                 V_x = np.copy(self.V_x)
                 V_xx = np.copy(self.V_xx)
                 break
-
+            
             else:
                 backward_pass_flag = 1
                 # update gains as follows
@@ -149,7 +154,11 @@ class iLQR:
         return backward_pass_flag, del_J_alpha
     
     def forward_pass(self, del_J_alpha):
-
+        """
+            Forward pass with line search
+            del_J_alpha : expected cost reduction scaled with alpha
+            returns : forward_pass_flag : 1 if forward pass is successful else 0
+        """
         #cost before forward pass
         J1 = self.calculate_total_cost(self.X_0, self.X, self.U, self.N)
 
@@ -185,20 +194,23 @@ class iLQR:
         Q_x = self.l_x(x) + ((F_x.T) @ V_x_next)
         Q_u = self.l_u(u) + ((F_u.T) @ V_x_next)
 
-        Q_xx = 2*self.Q + ((F_x.T) @ ((V_xx_next)  @ F_x)) 
+        Q_xx = 2*self.Q + ((F_x.T) @ (V_xx_next @ F_x)) 
         Q_ux = (F_u.T) @ ((V_xx_next + self.mu*np.eye(V_xx_next.shape[0])) @ F_x)
         Q_uu = 2*self.R + (F_u.T) @ ((V_xx_next + self.mu*np.eye(V_xx_next.shape[0])) @ F_u)
 
         return Q_x, Q_u, Q_xx, Q_uu, Q_ux
-
+    
     def forward_pass_simulate(self):
+        """ 
+        Simulate the system with updated controls 
+        """
         for t in range(self.N):
             if t==0:
                 self.U[t] = self.U_temp[t] + self.alpha*self.k[t] #TODO check for K(x-X_0)
-                self.X[t] = self.model.simulate(self.X_0.flatten(),self.U[t].flatten()).reshape(np.shape(self.X_0))
+                self.X[t] = self.model.simulate_step(self.X_0.flatten(),self.U[t].flatten()).reshape(np.shape(self.X_0))
             else:
                 self.U[t] = self.U_temp[t] + self.alpha*self.k[t] + (self.K[t] @ (self.X[t-1] - self.X_temp[t-1]))
-                self.X[t] = self.model.simulate(self.X[t-1].flatten(),self.U[t].flatten()).reshape(np.shape(self.X_0))
+                self.X[t] = self.model.simulate_step(self.X[t-1].flatten(),self.U[t].flatten()).reshape(np.shape(self.X_0))
 
     def initialize_traj(self,u_init):
         """

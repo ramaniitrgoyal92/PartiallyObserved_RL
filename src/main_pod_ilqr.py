@@ -18,12 +18,11 @@ class POD_iLQR(iLQR):
         self.Z = np.zeros((self.N, self.n_z, 1))
         self.Z_temp = np.zeros((self.N, self.n_z, 1))
 
-
         # self.K = np.zeros((self.N, self.n_u, n_z*q+self.n_u*(q_u-1)))
         # self.k = np.zeros((self.N, self.n_u, 1))
 		
-        self.V_xx = np.zeros((self.N, n_z*q+self.n_u*(q_u-1), n_z*q+self.n_u*(q_u-1)))
-        self.V_x = np.zeros((self.N, n_z*q+self.n_u*(q_u-1), 1))
+        # self.V_xx = np.zeros((self.N, n_z*q+self.n_u*(q_u-1), n_z*q+self.n_u*(q_u-1)))
+        # self.V_x = np.zeros((self.N, n_z*q+self.n_u*(q_u-1), 1))
         
         self.ltv_sys_id = ARMA_LTV_SysID(self.model, self.n_x, n_u, n_z, C, q, q_u, self.N, n_samples=n_sys_id_samples, pert_sigma = pert_sys_id_sigma)
         
@@ -68,10 +67,10 @@ class POD_iLQR(iLQR):
                   del_J_alpha : expected cost reduction
         """
         ################## defining local functions & variables for faster access ################
-        k = self.k
-        K = self.K
-        V_x = self.V_x
-        V_xx = self.V_xx
+        k = np.copy(self.k)
+        K = np.copy(self.K)
+        V_x = np.copy(self.V_x)
+        V_xx = np.copy(self.V_xx)
         ##########################################################################################
 
         V_x[self.N-1] = self.l_x_N(self.X[self.N-1])	
@@ -87,51 +86,44 @@ class POD_iLQR(iLQR):
             F_x = Fx_Fu[t][:,:self.n_x]
             F_u = Fx_Fu[t][:,self.n_x:]
 
-        # #TODO: TEST CODE
-        # # del_J_alpha, b_pass_success_flag = partials_list(self.X_p_0, self.U_p, V_x, V_xx, del_J_alpha)
-        # A_aug, B_aug, V_z_F_XU_XU, traj = self.ltv_sys_id.traj_sys_id_state_pertb(np.concatenate((self.X_0.reshape(1, self.n_x, 1), self.X), axis=0), self.U)
-        # # A_aug, B_aug, V_z_F_XU_XU, traj = self.sys_id(x_0, u_nom, central_diff=1, V_x=V_x)
-
-        # # for t in range(self.N-1, -1, -1):
-        #     F_x = A_aug[t]
-        #     F_u = B_aug[t]
-
             if t>0:
-                Q_z, Q_u, Q_zz, Q_uu, Q_uz = self.get_gradients(F_x,F_u,self.X[t-1],self.U[t],V_x[t], V_xx[t])
+                Q_x, Q_u, Q_xx, Q_uu, Q_ux = self.get_gradients(F_x,F_u,self.X[t-1],self.U[t],V_x[t], V_xx[t])
             else:
-                Q_z, Q_u, Q_zz, Q_uu, Q_uz = self.get_gradients(F_x,F_u,self.X_0,self.U[0],V_x[0], V_xx[0])
+                Q_x, Q_u, Q_xx, Q_uu, Q_ux = self.get_gradients(F_x,F_u,self.X_0,self.U[0],V_x[0], V_xx[0])
             
-
+            
             try:
                 np.linalg.cholesky(Q_uu)
 
             except np.linalg.LinAlgError:
                 print("FAILED! Q_uu is not Positive definite at t=",t)
                 backward_pass_flag = 0
-                k = self.k
-                K = self.K
-                V_x = self.V_x
-                V_xx = self.V_xx
+                k = np.copy(self.k)
+                K = np.copy(self.K)
+                V_x = np.copy(self.V_x)
+                V_xx = np.copy(self.V_xx)
+                break
+
             else:
                 backward_pass_flag = 1
                 # update gains as follows
                 Q_uu_inv = np.linalg.inv(Q_uu)
                 k[t] = -(Q_uu_inv @ Q_u)
-                K[t] = -(Q_uu_inv @ Q_uz)
+                K[t] = -(Q_uu_inv @ Q_ux)
 
                 del_J_alpha += -self.alpha*((k[t].T) @ Q_u) - 0.5*self.alpha**2 * ((k[t].T) @ (Q_uu @ k[t]))
 				
                 if t>0:
-                    V_x[t-1] = Q_z + (K[t].T) @ (Q_uu @ k[t]) + ((K[t].T) @ Q_u) + ((Q_uz.T) @ k[t])
-                    V_xx[t-1] = Q_zz + ((K[t].T) @ (Q_uu @ K[t])) + ((K[t].T) @ Q_uz) + ((Q_uz.T) @ K[t])
+                    V_x[t-1] = Q_x + (K[t].T) @ (Q_uu @ k[t]) + ((K[t].T) @ Q_u) + ((Q_ux.T) @ k[t])
+                    V_xx[t-1] = Q_xx + ((K[t].T) @ (Q_uu @ K[t])) + ((K[t].T) @ Q_ux) + ((Q_ux.T) @ K[t])
 
 		######################### Update the new gains ##############################################
-        self.k = k
-        self.K = K
-        self.V_x = V_x
-        self.V_xx = V_xx
+        self.k = np.copy(k)
+        self.K = np.copy(K)
+        self.V_x = np.copy(V_x)
+        self.V_xx = np.copy(V_xx)
 
-        return backward_pass_flag, del_J_alpha 
+        return backward_pass_flag, del_J_alpha
     
     def forward_pass(self, del_J_alpha):
         """
@@ -142,8 +134,8 @@ class POD_iLQR(iLQR):
         #cost before forward pass
         J1 = self.calculate_total_cost(self.X_0, self.X, self.U, self.N)
 
-        self.X_temp = self.X
-        self.U_temp = self.U
+        self.X_temp = np.copy(self.X)
+        self.U_temp = np.copy(self.U)
 
         self.forward_pass_simulate()
 
@@ -152,14 +144,14 @@ class POD_iLQR(iLQR):
 
         if (J1-J2)/del_J_alpha < self.J_change_eps:
             forward_pass_flag = 0
-            self.X = self.X_temp
-            self.U = self.U_temp
+            self.X = np.copy(self.X_temp)
+            self.U = np.copy(self.U_temp)
         else:
             forward_pass_flag = 1
 
         return forward_pass_flag
 
-    def get_gradients(self,F_x,F_u,x,u, V_x, V_xx):
+    def get_gradients(self,F_x,F_u,x,u,V_x_next, V_xx_next):
         """
         Compute the gradients of Q function
         F_x : (nx,nx)
@@ -171,16 +163,15 @@ class POD_iLQR(iLQR):
         returns : Q_x, Q_u, Q_xx, Q_uu, Q_
         """
         # Exactly same from iLQR, will be removed later
-        # Q_z = self.l_x(traj[:,t].reshape(self.n_x,1)) + ((F_x.T) @ V_x)
-        Q_z = self.l_x(x) + ((F_x.T) @ V_x)
-        Q_u = self.l_u(u) + ((F_u.T) @ V_x)
+        # Q_x = self.l_x(traj[:,t].reshape(self.n_x,1)) + ((F_x.T) @ V_x)
+        Q_x = self.l_x(x) + ((F_x.T) @ V_x_next)
+        Q_u = self.l_u(u) + ((F_u.T) @ V_x_next)
 
-        Q_zz = 2*self.Q + ((F_x.T) @ (V_xx @ F_x)) 
-        Q_uz = (F_u.T) @ ((V_xx + self.mu*np.eye(V_xx.shape[0])) @ F_x)
-        Q_uu = 2*self.R + (F_u.T) @ ((V_xx + self.mu*np.eye(V_xx.shape[0])) @ F_u)
+        Q_xx = 2*self.Q + ((F_x.T) @ (V_xx_next @ F_x)) 
+        Q_ux = (F_u.T) @ ((V_xx_next + self.mu*np.eye(V_xx_next.shape[0])) @ F_x)
+        Q_uu = 2*self.R + (F_u.T) @ ((V_xx_next + self.mu*np.eye(V_xx_next.shape[0])) @ F_u)
 
-        return Q_z, Q_u, Q_zz, Q_uu, Q_uz
-        
+        return Q_x, Q_u, Q_xx, Q_uu, Q_ux
     
     def forward_pass_simulate(self):
         """ 
@@ -189,28 +180,28 @@ class POD_iLQR(iLQR):
         for t in range(self.N):
             if t==0:
                 self.U[t] = self.U_temp[t] + self.alpha*self.k[t] #TODO check for K(x-X_0)
-                self.Z[t] = self.model.simulate(self.X_0.flatten(),self.U[t].flatten()).reshape(self.n_z,1)
+                self.X[t] = self.model.simulate_step(self.X_0.flatten(),self.U[t].flatten()).reshape(self.n_z,1)
             else:
                 self.U[t] = self.U_temp[t] + self.alpha*self.k[t] + (self.K[t] @ (self.X[t-1] - self.X_temp[t-1]))
-                self.Z[t] = self.model.simulate(self.X[t-1].flatten(),self.U[t].flatten()).reshape(self.n_z,1)
+                self.X[t] = self.model.simulate_step(self.X[t-1].flatten(),self.U[t].flatten()).reshape(self.n_z,1)
 
     
-    def l_x(self, x):
-        """
-        Compute the gradient of the running cost
-        x : (n_x,1)
-        returns : l_x : (n_x,1)
-        """
-        z = np.zeros((np.shape(self.Q)[0], 1))
-        z[:self.n_z,:] = self.C @(x - self.X_N)
-        return 2*self.Q @ z
+    # def l_x(self, x):
+    #     """
+    #     Compute the gradient of the running cost
+    #     x : (n_x,1)
+    #     returns : l_x : (n_x,1)
+    #     """
+    #     z = np.zeros((np.shape(self.Q)[0], 1))
+    #     z[:self.n_z,:] = self.C @(x - self.X_N)
+    #     return 2*self.Q @ z
 
-    def l_x_N(self, x):
-        """
-        Compute the gradient of the terminal cost
-        x : (n_x,1)
-        returns : l_x_N : (n_x,1)
-        """
-        z = np.zeros((np.shape(self.Q)[0], 1))
-        z[:self.n_z,:] = self.C @(x - self.X_N)
-        return 2*self.Q_final @ z
+    # def l_x_N(self, x):
+    #     """
+    #     Compute the gradient of the terminal cost
+    #     x : (n_x,1)
+    #     returns : l_x_N : (n_x,1)
+    #     """
+    #     z = np.zeros((np.shape(self.Q)[0], 1))
+    #     z[:self.n_z,:] = self.C @(x - self.X_N)
+    #     return 2*self.Q_final @ z

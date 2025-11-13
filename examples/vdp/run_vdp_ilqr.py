@@ -24,8 +24,8 @@ class RunVdp(SimulateVDP):
     def __init__(self, mu, state_dimension, control_dimension, dt):
         SimulateVDP.__init__(self, mu, state_dimension, control_dimension, dt)
 
-    def simulate(self,x,u):
-        return self.simulate_vdp(x, u)[-1]
+    def simulate_step(self,x,u):
+        return self.simulate_trajectory(x, u)[-1]
 
 
 if __name__=="__main__":
@@ -56,7 +56,7 @@ if __name__=="__main__":
 
     # Create iLQR instance
     ilqr = iLQR(run_vdp, state_dimension, control_dimension, alpha, horizon, init_state, final_state, Q, Q_final, R, 
-                nominal_init_stddev, n_sys_id_samples=100, pert_sys_id_sigma=1e-5, arma_sys_id_flag = False)
+                nominal_init_stddev, n_sys_id_samples=100, pert_sys_id_sigma=1e-5, arma_sys_id_flag = True)
     ilqr.iterate_ilqr(n_iterations)
 
     ilqr.plot_episodic_cost_history(path_to_training_cost_fig)
@@ -64,7 +64,7 @@ if __name__=="__main__":
     ilqr.save_cost(path_to_cost_file)
 
     # Check and Simulate the obtained policy
-    run_vdp.simulate_vdp(y_init = init_state.flatten(), u = ilqr.U.flatten(), horizon=horizon)
+    run_vdp.simulate_trajectory(y_init = init_state.flatten(), u = ilqr.U.flatten(), horizon=horizon)
     run_vdp.draw_figure(path_to_traj_fig)
 
     # Test sys_id

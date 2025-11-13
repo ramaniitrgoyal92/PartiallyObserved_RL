@@ -24,8 +24,8 @@ class RunCartPole(SimulateCartPole):
     def __init__(self, state_dimension, control_dimension, dt):
         SimulateCartPole.__init__(self, state_dimension, control_dimension, dt)
 
-    def simulate(self,x,u):
-        return self.simulate_cartpole(x, u)[-1]
+    def simulate_step(self,x,u):
+        return self.simulate_trajectory(x, u)[-1]
 
 
 if __name__=="__main__":
@@ -67,11 +67,5 @@ if __name__=="__main__":
     
     # Check and Simulate the obtained policy
     # print
-    run_cartpole.simulate_cartpole(state_init = init_state.flatten(), u = ilqr.U.flatten(), horizon=horizon)
+    run_cartpole.simulate_trajectory(state_init = init_state.flatten(), u = ilqr.U.flatten(), horizon=horizon)
     run_cartpole.draw_figure(path_to_traj_fig)
-
-    # Test sys_id
-    """ x_t = np.array([2.0,0.0]).reshape(state_dimension,1)
-    u_t = np.array([0]).reshape(control_dimension,1)
-    AB = model.sys_id(x_t,u_t)
-    print(AB) """

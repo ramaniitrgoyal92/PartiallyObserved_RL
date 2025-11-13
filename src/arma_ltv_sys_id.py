@@ -1,7 +1,5 @@
 import numpy as np
-import math
 from ltv_sys_id import LTV_SysID
-import sys
 class ARMA_LTV_SysID(LTV_SysID):
 
     def __init__(self, MODEL, n_x, n_u, n_z, C, q, q_u, N, n_samples=500, pert_sigma = 1e-3):
@@ -40,7 +38,7 @@ class ARMA_LTV_SysID(LTV_SysID):
         X_pertb, U_pertb = self.generate_rollouts(x_nom, u_nom)
         Z = self.C @ X_pertb #TODO : (N+1,nx,n_samples) -> (N+1,nz,n_samples)
         
-        # # Generating delta_z for all rollouts
+        # Generating delta_z for all rollouts
         delta_Z = np.zeros((N+1, n_z, self.n_samples))
         for i in range(N+1):
             delta_Z[i, :, :] = Z[i, :, :] - Z_nom[i, :, 0:1]

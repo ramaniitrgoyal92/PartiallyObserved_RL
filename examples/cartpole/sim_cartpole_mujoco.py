@@ -140,7 +140,7 @@ class SimulateCartPole:
         
         return next_state
     
-    def simulate_cartpole(self, state_init=np.array([0.0, 0.0, np.pi, 0.0]), 
+    def simulate_trajectory(self, state_init=np.array([0.0, 0.0, np.pi, 0.0]), 
                           u=np.array([0.0]), horizon=1, n_per_step=1):
         """
         Simulate CartPole trajectory
@@ -280,7 +280,7 @@ if __name__ == '__main__':
     sim = SimulateCartPole(nx, nu, dt)
     
     # Run simulation
-    trajectory = sim.simulate_cartpole(
+    trajectory = sim.simulate_trajectory(
         state_init=state_init,
         u=control,
         horizon=time_horizon,

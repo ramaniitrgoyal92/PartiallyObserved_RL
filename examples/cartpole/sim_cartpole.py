@@ -131,8 +131,8 @@ class SimulateCartPole:
         
         return next_state
     
-    def simulate_cartpole(self, state_init=np.array([0.0, 0.0, np.pi, 0.0]), 
-                          u=np.array([0.0]), horizon=1, n_per_step=1):
+    def simulate_trajectory(self, state_init=np.array([0.0, 0.0, np.pi, 0.0]), 
+                          u=np.array([0.0]), horizon=1, n_per_step=20):
         """
         Simulate CartPole trajectory using Forward Euler
         
@@ -149,16 +149,19 @@ class SimulateCartPole:
             u = np.zeros(horizon)
         u = u.flatten()
         
-        total_steps = horizon * n_per_step
-        self.T = np.linspace(0, horizon * self.dt, total_steps)
+        total_steps = (horizon + 1)
+        self.T = np.linspace(0, (horizon + 1) * self.dt, total_steps)
         self.Y = np.zeros((total_steps, self.nx))
         self.U = u
+
+        # Store initial state
+        self.Y[0, :] = state_init
         
         state = state_init.copy()
         
         for i in range(horizon):
             states = self.onestep_euler(state, n_per_step, u[i])
-            self.Y[n_per_step*i:n_per_step*(i+1), :] = states
+            self.Y[i+1, :] = states[-1]
             state = states[-1]
         
         return self.Y
@@ -271,7 +274,7 @@ if __name__ == '__main__':
     sim = SimulateCartPole(nx, nu, dt)
     
     # Run simulation
-    trajectory = sim.simulate_cartpole(
+    trajectory = sim.simulate_trajectory(
         state_init=state_init,
         u=control,
         horizon=time_horizon,
