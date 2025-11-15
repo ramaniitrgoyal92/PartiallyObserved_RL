@@ -1,11 +1,7 @@
 import numpy as np
-import math
 import sys
 import os
 from pathlib import Path
-
-import sys
-import os
 
 
 # import Iterative_LQR
@@ -20,7 +16,7 @@ from main_ilqr import iLQR
 from main_pod_ilqr import POD_iLQR
 from ltv_sys_id import LTV_SysID
 from arma_ltv_sys_id import ARMA_LTV_SysID
-import sys
+
 class RunVdp(SimulateVDP):
 
     def __init__(self, mu, state_dimension, control_dimension, dt, C):
@@ -28,7 +24,7 @@ class RunVdp(SimulateVDP):
         self.C = C
 
     def simulate_step(self,x,u):
-        return self.C @ self.simulate_trajectory(x, u)[-1]
+        return self.simulate_trajectory(x, u)[-1]
 
 
 if __name__=="__main__":
@@ -46,22 +42,22 @@ if __name__=="__main__":
 
     init_state = np.zeros((state_dimension,1))
     init_state[0] = .2
-    final_state = np.zeros((state_dimension, 1))
+    final_state = np.zeros((n_aug,1))
+    
+    Q = Q_aug
+    Q_final = Q_final_aug
 
     print('Initial phase : \n', init_state)
     print('Goal phase : \n', final_state)
 	
     # No. of ILQR iterations to run
     n_iterations = 10
-    # C = np.array([1.0, 0])
-    C = np.eye(2)
-    n_z = C.shape[0]
 
     # Create model instance
     run_vdp = RunVdp(mu, state_dimension, control_dimension, dt, C)
 
     # Create iLQR instance
-    ilqr = POD_iLQR(C, run_vdp, control_dimension, alpha, horizon, init_state, final_state, n_z, q, q_u, Q, Q_final, R, 
+    ilqr = POD_iLQR(C, run_vdp, state_dimension, control_dimension, alpha, horizon, init_state, final_state, n_z, q, q_u, Q, Q_final, R, 
                 nominal_init_stddev, n_sys_id_samples=100, pert_sys_id_sigma=1e-5, arma_sys_id_flag = True)
     ilqr.iterate_ilqr(n_iterations)
 

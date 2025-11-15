@@ -31,11 +31,10 @@ class ARMA_LTV_SysID(LTV_SysID):
 		'''
 		################## defining local functions & variables for faster access ################
         n_z, N = self.n_z, self.N
-        self.X_0 = (x_nom[0]).reshape(n_z,1)
-        Z_nom = x_nom
 		##########################################################################################
         # Generating perturbations
         X_pertb, U_pertb = self.generate_rollouts(x_nom, u_nom)
+        Z_nom = self.C @ x_nom
         Z = self.C @ X_pertb #TODO : (N+1,nx,n_samples) -> (N+1,nz,n_samples)
         
         # Generating delta_z for all rollouts
