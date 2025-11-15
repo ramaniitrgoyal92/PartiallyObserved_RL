@@ -24,7 +24,7 @@ Q_final_aug = Q_terminal_aug
 
 # Number of substeps in simulation
 ctrl_state_freq_ratio = 1
-dt = 0.1
+dt = 0.005
 horizon = 600 
 nominal_init_stddev = 0.1
 

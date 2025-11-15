@@ -1,11 +1,7 @@
 import numpy as np
-import math
 import sys
 import os
 from pathlib import Path
-
-import sys
-import os
 
 
 # import Iterative_LQR
@@ -56,7 +52,7 @@ if __name__=="__main__":
 
     # Create iLQR instance
     ilqr = iLQR(run_swimmer6, state_dimension, control_dimension, alpha, horizon, init_state, final_state, Q, Q_final, R, 
-                nominal_init_stddev, n_sys_id_samples=50, pert_sys_id_sigma=1e-7, arma_sys_id_flag = False)
+                nominal_init_stddev, n_sys_id_samples=100, pert_sys_id_sigma=1e-7, arma_sys_id_flag = True)
     ilqr.iterate_ilqr(n_iterations)
 
 
