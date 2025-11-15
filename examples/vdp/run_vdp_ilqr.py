@@ -1,11 +1,7 @@
 import numpy as np
-import math
 import sys
 import os
 from pathlib import Path
-
-import sys
-import os
 
 
 # import Iterative_LQR
@@ -66,9 +62,3 @@ if __name__=="__main__":
     # Check and Simulate the obtained policy
     run_vdp.simulate_trajectory(y_init = init_state.flatten(), u = ilqr.U.flatten(), horizon=horizon)
     run_vdp.draw_figure(path_to_traj_fig)
-
-    # Test sys_id
-    """ x_t = np.array([2.0,0.0]).reshape(state_dimension,1)
-    u_t = np.array([0]).reshape(control_dimension,1)
-    AB = model.sys_id(x_t,u_t)
-    print(AB) """

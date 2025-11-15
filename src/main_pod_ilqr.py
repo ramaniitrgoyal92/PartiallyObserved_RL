@@ -6,23 +6,28 @@ np.random.seed(42)
 
 class POD_iLQR(iLQR):
 
-    def __init__(self, C, MODEL, n_u, alpha, horizon, init_state, final_state, n_z, q, q_u, Q, Q_final, R, 
+    def __init__(self, C, MODEL, n_x, n_u, alpha, horizon, init_state, final_state, n_z, q, q_u, Q, Q_final, R, 
                  nominal_init_stddev, n_sys_id_samples, pert_sys_id_sigma, arma_sys_id_flag = True):
-        iLQR.__init__(self, MODEL, n_z*q+n_u*(q_u-1), n_u, alpha, horizon, init_state, final_state, 
-                      Q, Q_final, R, nominal_init_stddev, n_sys_id_samples, pert_sys_id_sigma, arma_sys_id_flag = arma_sys_id_flag)
         self.C = C
         self.n_z = n_z
         self.q = q
         self.q_u = q_u
+        self.n_aug = n_z*q+n_u*(q_u-1)
+        iLQR.__init__(self, MODEL, n_x, n_u, alpha, horizon, init_state, final_state, 
+                      Q, Q_final, R, nominal_init_stddev, n_sys_id_samples, pert_sys_id_sigma, arma_sys_id_flag = arma_sys_id_flag)
+        
+        self.Z_aug_0 = np.zeros((self.n_aug,1))
+        self.Z_aug_0[0:n_z,:] = self.C @ self.X_0
+        self.Z_aug = np.zeros((self.N, self.n_aug, 1))
 
         self.Z = np.zeros((self.N, self.n_z, 1))
         self.Z_temp = np.zeros((self.N, self.n_z, 1))
 
-        # self.K = np.zeros((self.N, self.n_u, n_z*q+self.n_u*(q_u-1)))
-        # self.k = np.zeros((self.N, self.n_u, 1))
+        self.K = np.zeros((self.N, self.n_u, self.n_aug))
+        self.k = np.zeros((self.N, self.n_u, 1))
 		
-        # self.V_xx = np.zeros((self.N, n_z*q+self.n_u*(q_u-1), n_z*q+self.n_u*(q_u-1)))
-        # self.V_x = np.zeros((self.N, n_z*q+self.n_u*(q_u-1), 1))
+        self.V_xx = np.zeros((self.N, self.n_aug, self.n_aug))
+        self.V_x = np.zeros((self.N, self.n_aug, 1))
         
         self.ltv_sys_id = ARMA_LTV_SysID(self.model, self.n_x, n_u, n_z, C, q, q_u, self.N, n_samples=n_sys_id_samples, pert_sigma = pert_sys_id_sigma)
         
@@ -58,7 +63,7 @@ class POD_iLQR(iLQR):
             else:
                 self.alpha = self.alpha*0.999
 
-            self.episodic_cost_history.append(self.calculate_total_cost(self.X_0, self.X, self.U, self.N))
+            self.episodic_cost_history.append(self.calculate_total_cost(self.Z_aug_0, self.Z_aug, self.U, self.N))
 
     def backward_pass(self):
         """
@@ -73,23 +78,22 @@ class POD_iLQR(iLQR):
         V_xx = np.copy(self.V_xx)
         ##########################################################################################
 
-        V_x[self.N-1] = self.l_x_N(self.X[self.N-1])	
+        V_x[self.N-1] = self.l_x_N(self.Z_aug[self.N-1])	
         V_xx[self.N-1] = 2*self.Q_final
 
         # Initialize before forward pass
         del_J_alpha = 0
 
-        Fx_Fu = self.ltv_sys_id.traj_sys_id(np.concatenate((self.X_0.reshape(1, self.n_x, 1), self.X), axis=0), self.U)
+        Fx_Fu = self.ltv_sys_id.traj_sys_id(np.concatenate((self.X_0.reshape(1, self.n_x, 1), self.X), axis=0), self.U) # only init state and Z trajectory needed
         
-        for t in range(self.N-1, -1, -1):
-        # for t in range(self.N-1, max(self.q, self.q_u)-1, -1):
-            F_x = Fx_Fu[t][:,:self.n_x]
-            F_u = Fx_Fu[t][:,self.n_x:]
+        for t in range(self.N-1, max(self.q, self.q_u)-1, -1):
+            F_x = Fx_Fu[t][:,:self.n_aug]
+            F_u = Fx_Fu[t][:,self.n_aug:]
 
             if t>0:
-                Q_x, Q_u, Q_xx, Q_uu, Q_ux = self.get_gradients(F_x,F_u,self.X[t-1],self.U[t],V_x[t], V_xx[t])
+                Q_x, Q_u, Q_xx, Q_uu, Q_ux = self.get_gradients(F_x,F_u,self.Z_aug[t-1],self.U[t],V_x[t], V_xx[t])
             else:
-                Q_x, Q_u, Q_xx, Q_uu, Q_ux = self.get_gradients(F_x,F_u,self.X_0,self.U[0],V_x[0], V_xx[0])
+                Q_x, Q_u, Q_xx, Q_uu, Q_ux = self.get_gradients(F_x,F_u,self.Z_aug_0,self.U[0],V_x[0], V_xx[0])
             
             
             try:
@@ -132,59 +136,113 @@ class POD_iLQR(iLQR):
             returns : forward_pass_flag : 1 if forward pass is successful else 0
         """
         #cost before forward pass
-        J1 = self.calculate_total_cost(self.X_0, self.X, self.U, self.N)
+        J1 = self.calculate_total_cost(self.Z_aug_0, self.Z_aug, self.U, self.N)
 
         self.X_temp = np.copy(self.X)
+        self.Z_temp = np.copy(self.Z)
         self.U_temp = np.copy(self.U)
 
         self.forward_pass_simulate()
 
         #cost after forward pass
-        J2 = self.calculate_total_cost(self.X_0, self.X, self.U, self.N)
+        J2 = self.calculate_total_cost(self.Z_aug_0, self.Z_aug, self.U, self.N)
 
         if (J1-J2)/del_J_alpha < self.J_change_eps:
             forward_pass_flag = 0
             self.X = np.copy(self.X_temp)
+            self.Z = np.copy(self.Z_temp)
             self.U = np.copy(self.U_temp)
         else:
             forward_pass_flag = 1
 
         return forward_pass_flag
-
-    def get_gradients(self,F_x,F_u,x,u,V_x_next, V_xx_next):
-        """
-        Compute the gradients of Q function
-        F_x : (nx,nx)
-        F_u : (nx,nu)
-        x : (nx,1)
-        u : (nu,1)
-        V_x_next : (nx,1)
-        V_xx_next : (nx,nx)
-        returns : Q_x, Q_u, Q_xx, Q_uu, Q_
-        """
-        # Exactly same from iLQR, will be removed later
-        # Q_x = self.l_x(traj[:,t].reshape(self.n_x,1)) + ((F_x.T) @ V_x)
-        Q_x = self.l_x(x) + ((F_x.T) @ V_x_next)
-        Q_u = self.l_u(u) + ((F_u.T) @ V_x_next)
-
-        Q_xx = 2*self.Q + ((F_x.T) @ (V_xx_next @ F_x)) 
-        Q_ux = (F_u.T) @ ((V_xx_next + self.mu*np.eye(V_xx_next.shape[0])) @ F_x)
-        Q_uu = 2*self.R + (F_u.T) @ ((V_xx_next + self.mu*np.eye(V_xx_next.shape[0])) @ F_u)
-
-        return Q_x, Q_u, Q_xx, Q_uu, Q_ux
     
     def forward_pass_simulate(self):
         """ 
         Simulate the system with updated controls 
         """
-        for t in range(self.N):
-            if t==0:
-                self.U[t] = self.U_temp[t] + self.alpha*self.k[t] #TODO check for K(x-X_0)
-                self.X[t] = self.model.simulate_step(self.X_0.flatten(),self.U[t].flatten()).reshape(self.n_z,1)
-            else:
-                self.U[t] = self.U_temp[t] + self.alpha*self.k[t] + (self.K[t] @ (self.X[t-1] - self.X_temp[t-1]))
-                self.X[t] = self.model.simulate_step(self.X[t-1].flatten(),self.U[t].flatten()).reshape(self.n_z,1)
+        ################## defining local functions & variables for faster access ################
+        n_z, n_u, q, q_u = self.n_z, self.n_u, self.q, self.q_u
+		##########################################################################################
+        z = np.zeros((n_z*q,1))
+        u = np.zeros((n_u*q_u,1))
+        d_z = np.zeros((n_z*q,1))
+        d_u = np.zeros((n_u*q_u,1))
 
+        for t in range(self.N):
+            if t < max(q, q_u):
+                self.U[t] = self.U_temp[t] + self.alpha*self.k[t]
+                d_u[n_u*(q_u-t-1):n_u*(q_u-t)] = self.U[t]-self.U_temp[t]
+                u[n_u*(q_u-t-1):n_u*(q_u-t)] = self.U[t]
+                if t != 0:
+                    d_z[n_z*(q-t-1):n_z*(q-t)] = self.Z[t-1] - self.Z_temp[t-1]	
+                    z[n_z*(q-t-1):n_z*(q-t)] = self.Z[t-1]
+            else:
+                d_z_prev = d_z[:n_z*(q-1)]
+                d_z[n_z:] = d_z_prev
+                z_prev = z[:n_z*(q-1)]
+                z[n_z:] = z_prev
+
+                d_u_prev = d_u[:n_u*(q_u-1)]
+                d_u[n_u:] = d_u_prev
+                u_prev = u[:n_u*(q_u-1)]
+                u[n_u:] = u_prev
+
+                d_z[:n_z] = self.Z[t-1] - self.Z_temp[t-1]
+                z[:n_z] = self.Z[t-1]
+
+                self.U[t] = self.U_temp[t] + self.alpha*self.k[t] + (self.K[t] @ np.vstack([d_z, d_u[n_u:]]))
+                d_u[:n_u] = self.U[t]-self.U_temp[t]
+                u[:n_u] = self.U[t]
+                self.Z_aug[t] = np.vstack([z, u[n_u:]])
+                # self.Z_aug[t] = np.vstack([d_z, d_u[n_u:]])
+
+
+
+            if t==0:
+                self.X[t] = self.model.simulate_step(self.X_0.flatten(),self.U[t].flatten()).reshape(np.shape(self.X_0))
+                self.Z[t] = self.C @ self.X[t]
+            else:
+                self.X[t] = self.model.simulate_step(self.X[t-1].flatten(),self.U[t].flatten()).reshape(np.shape(self.X_0))
+                self.Z[t] = self.C @ self.X[t]
+
+    def initialize_traj(self,u_init):
+        """
+        Initialize the nominal trajectory with an initial guess for control
+        u_init : (N, n_u, 1)
+        """
+        if u_init is None:
+            self.U = np.random.normal(0, self.nominal_init_stddev, (self.N, self.n_u, 1))
+        else:
+            self.U = u_init #TODO: check the shape of u_init
+
+        self.U_temp = self.U
+        self.forward_pass_simulate()
+        self.X_temp = self.X
+        self.Z_temp = self.Z
+
+    # def calculate_total_cost(self,X_0, state_traj, control_traj, horizon):
+    #     total_cost = 0
+    #     total_cost += self.incremental_cost(X_0,control_traj[0])
+    #     for t in range(horizon-1):
+    #         total_cost += self.incremental_cost(state_traj[t],control_traj[t+1])
+    #     total_cost += self.terminal_cost(state_traj[horizon-1])
+
+    #     return total_cost
+    
+    # def incremental_cost(self,x,u):
+    #     '''
+	# 		Incremental cost in terms of state and controls.
+    #         Can be overwritten in actual working example
+	# 	'''
+    #     return (((x - self.X_N).T @ self.Q) @ (x - self.X_N)) + (((u.T) @ self.R) @ u)
+	
+    # def terminal_cost(self,x):
+    #     '''
+	# 		Terminal cost in terms of state.
+    #         Can be overwritten in actual working example
+	# 	'''
+    #     return (((x - self.X_N).T @ self.Q_final) @ (x - self.X_N)) 
     
     # def l_x(self, x):
     #     """
