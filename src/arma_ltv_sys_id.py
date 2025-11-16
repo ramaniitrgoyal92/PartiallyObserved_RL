@@ -2,7 +2,7 @@ import numpy as np
 from ltv_sys_id import LTV_SysID
 class ARMA_LTV_SysID(LTV_SysID):
 
-    def __init__(self, MODEL, n_x, n_u, n_z, C, q, q_u, N, n_samples=500, pert_sigma = 1e-3):
+    def __init__(self, MODEL, n_x, n_u, n_z, q, q_u, N, n_samples=500, pert_sigma = 1e-3):
         """
         ARMA LTV System Identification
         Args:
@@ -18,11 +18,10 @@ class ARMA_LTV_SysID(LTV_SysID):
         # super().__init__(MODEL, n_x, n_u, N, n_samples, pert_sigma)
         LTV_SysID.__init__(self, MODEL, n_x, n_u, N, n_samples = n_samples, pert_sigma = pert_sigma)
         self.n_z = n_z
-        self.C = C
         self.q = q
         self.q_u = q_u
 
-    def traj_sys_id(self, x_nom, u_nom):
+    def traj_sys_id(self, x_nom, u_nom, roll_start = 0):
         '''
             system identification for a given nominal state and control
             x_nom = (N+1, n_x, 1)
@@ -33,26 +32,24 @@ class ARMA_LTV_SysID(LTV_SysID):
         n_z, N = self.n_z, self.N
 		##########################################################################################
         # Generating perturbations
-        X_pertb, U_pertb = self.generate_rollouts(x_nom, u_nom)
-        Z_nom = self.C @ x_nom
-        Z = self.C @ X_pertb #TODO : (N+1,nx,n_samples) -> (N+1,nz,n_samples)
+        X_pertb, U_pertb = self.generate_rollouts(x_nom, u_nom, roll_start)
         
         # Generating delta_z for all rollouts
         delta_Z = np.zeros((N+1, n_z, self.n_samples))
         for i in range(N+1):
-            delta_Z[i, :, :] = Z[i, :, :] - Z_nom[i, :, 0:1]
+            delta_Z[i, :, :] = X_pertb[i, :, :] - x_nom[i, :, 0:1]
         
         delta_Z = delta_Z.transpose(2, 1, 0)  # (n_samples, n_z, N+1)
-        U_pertb = U_pertb.transpose(2, 1, 0)  # (n_samples, n_u, N+1)
+        U_pertb = U_pertb.transpose(2, 1, 0)  # (n_samples, n_u, N)
         
         return self.arma_fit(delta_Z, U_pertb)
     
 
-    def arma_fit(self, delta_Z, U_pertb):
+    def arma_fit(self, delta_Z, delta_U):
         """
         ARMA LTV fitting with forward time indexing
         delta_Z : (n_samples, n_z, N+1)
-        U_pertb : (n_samples, n_u, N+1)
+        delta_U : (n_samples, n_u, N+1)
         returns : AB_aug : (N, aug_dim, aug_dim + n_u)
         """
         n_z, n_u, q, q_u, N, n_samples = self.n_z, self.n_u, self.q, self.q_u, self.N, self.n_samples
@@ -100,7 +97,7 @@ class ARMA_LTV_SysID(LTV_SysID):
                 M[:, i*n_z:(i+1)*n_z] = delta_Z[:, :, t-q+i]
             
             for i in range(q_u):
-                M[:, q*n_z + i*n_u : q*n_z + (i+1)*n_u] = U_pertb[:, :, t-q_u+i]
+                M[:, q*n_z + i*n_u : q*n_z + (i+1)*n_u] = delta_U[:, :, t-q_u+i]
             
             # Target: δz[t]
             target[:, :] = delta_Z[:, :, t]

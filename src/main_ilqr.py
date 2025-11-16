@@ -20,7 +20,7 @@ class iLQR:
         self.nominal_init_stddev = nominal_init_stddev
         if arma_sys_id_flag:
             from arma_ltv_sys_id import ARMA_LTV_SysID
-            self.ltv_sys_id = ARMA_LTV_SysID(self.model, n_x, n_u, n_x, np.eye(n_x), 1, 1, self.N, n_samples=n_sys_id_samples, pert_sigma = pert_sys_id_sigma)
+            self.ltv_sys_id = ARMA_LTV_SysID(self.model, n_x, n_u, n_x, 1, 1, self.N, n_samples=n_sys_id_samples, pert_sigma = pert_sys_id_sigma)
         else:
             from ltv_sys_id import LTV_SysID
             self.ltv_sys_id = LTV_SysID(self.model, n_x, n_u, N = self.N, n_samples = n_sys_id_samples, pert_sigma = pert_sys_id_sigma)
@@ -207,10 +207,10 @@ class iLQR:
         for t in range(self.N):
             if t==0:
                 self.U[t] = self.U_temp[t] + self.alpha*self.k[t] #TODO check for K(x-X_0)
-                self.X[t] = self.model.simulate_step(self.X_0.flatten(),self.U[t].flatten()).reshape(np.shape(self.X_0))
+                self.X[t] = self.model.simulate_step(0,self.U[t].flatten()).reshape((self.n_x,1))
             else:
                 self.U[t] = self.U_temp[t] + self.alpha*self.k[t] + (self.K[t] @ (self.X[t-1] - self.X_temp[t-1]))
-                self.X[t] = self.model.simulate_step(self.X[t-1].flatten(),self.U[t].flatten()).reshape(np.shape(self.X_0))
+                self.X[t] = self.model.simulate_step(1,self.U[t].flatten()).reshape((self.n_x,1))
 
     def initialize_traj(self,u_init):
         """

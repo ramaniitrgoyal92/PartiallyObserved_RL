@@ -62,7 +62,7 @@ class LTV_SysID:
         
         return np.array(traj_AB)
     
-    def traj_sys_id(self, x_nom, u_nom, central_diff=0): #TODO rollout 
+    def traj_sys_id(self, x_nom, u_nom, roll_start = 0, central_diff=0): #TODO rollout 
         """
         System identification over the entire trajectory using control perturbations
         x_nom : (N+1, n_x, 1)
@@ -70,7 +70,7 @@ class LTV_SysID:
         returns : traj_AB : (N, n_x, n_x+n_u)
         """            
         delta_x = np.zeros(((self.N+1), self.n_x, self.n_samples))
-        X_pertb, U_pertb = self.generate_rollouts(x_nom, u_nom)
+        X_pertb, U_pertb = self.generate_rollouts(x_nom, u_nom, roll_start)
         traj_AB = []
 
         # Generating delta_x for all rollouts
@@ -105,7 +105,7 @@ class LTV_SysID:
 
     #     return X_pertb, U_pertb
 
-    def generate_rollouts(self, x_nom, u_nom):
+    def generate_rollouts(self, x_nom, u_nom, roll_start):
         """
         Generate rollouts around nominal trajectory using control perturbations
         x_nom : (N+1, n_x, 1)
@@ -117,9 +117,9 @@ class LTV_SysID:
         u_max = np.max(abs(u_nom))
         U_pertb = self.sigma*u_max*np.random.normal(0, 1, (self.N, self.n_u, self.n_samples))
         ctrl = u_nom + U_pertb
-        X_pertb = np.zeros((self.N+1, self.n_x, self.n_samples))
+        X_pertb = np.zeros((self.N+1, x_nom.shape[1], self.n_samples))
 
         for j in range(self.n_samples): # parallelize this loop
-            X_pertb[:,:,j] = self.model.simulate_trajectory(x_nom[0].flatten(), ctrl[:,:,j].reshape(self.N,self.n_u), horizon=self.N)
+            X_pertb[:,:,j] = self.model.simulate_trajectory(roll_start, ctrl[:,:,j].reshape(self.N,self.n_u), horizon=self.N)
  
         return X_pertb, U_pertb

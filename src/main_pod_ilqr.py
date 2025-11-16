@@ -6,18 +6,18 @@ np.random.seed(42)
 
 class POD_iLQR(iLQR):
 
-    def __init__(self, C, MODEL, n_x, n_u, alpha, horizon, init_state, final_state, n_z, q, q_u, Q, Q_final, R, 
-                 nominal_init_stddev, n_sys_id_samples, pert_sys_id_sigma, arma_sys_id_flag = True):
-        self.C = C
+    def __init__(self, MODEL, n_x, n_u, alpha, horizon, init_state, final_state, n_z, q, q_u, 
+                 Q, Q_final, R, nominal_init_stddev, n_sys_id_samples, pert_sys_id_sigma, arma_sys_id_flag = True):
         self.n_z = n_z
         self.q = q
         self.q_u = q_u
         self.n_aug = n_z*q+n_u*(q_u-1)
+        self.Z_0 = init_state
         iLQR.__init__(self, MODEL, n_x, n_u, alpha, horizon, init_state, final_state, 
                       Q, Q_final, R, nominal_init_stddev, n_sys_id_samples, pert_sys_id_sigma, arma_sys_id_flag = arma_sys_id_flag)
         
         self.Z_aug_0 = np.zeros((self.n_aug,1))
-        self.Z_aug_0[0:n_z,:] = self.C @ self.X_0
+        self.Z_aug_0[0:n_z,:] = self.Z_0
         self.Z_aug = np.zeros((self.N, self.n_aug, 1))
 
         self.Z = np.zeros((self.N, self.n_z, 1))
@@ -29,7 +29,7 @@ class POD_iLQR(iLQR):
         self.V_xx = np.zeros((self.N, self.n_aug, self.n_aug))
         self.V_x = np.zeros((self.N, self.n_aug, 1))
         
-        self.ltv_sys_id = ARMA_LTV_SysID(self.model, self.n_x, n_u, n_z, C, q, q_u, self.N, n_samples=n_sys_id_samples, pert_sigma = pert_sys_id_sigma)
+        self.ltv_sys_id = ARMA_LTV_SysID(self.model, self.n_x, n_u, n_z, q, q_u, self.N, n_samples=n_sys_id_samples, pert_sigma = pert_sys_id_sigma)
         
     def iterate_ilqr(self, n_iter, u_init=None):
         # exactly same from iLQR, will be removed later
@@ -84,9 +84,9 @@ class POD_iLQR(iLQR):
         # Initialize before forward pass
         del_J_alpha = 0
 
-        Fx_Fu = self.ltv_sys_id.traj_sys_id(np.concatenate((self.X_0.reshape(1, self.n_x, 1), self.X), axis=0), self.U) # only init state and Z trajectory needed
+        Fx_Fu = self.ltv_sys_id.traj_sys_id(np.concatenate((self.Z_0.reshape(1, self.n_z, 1), self.Z), axis=0), self.U) # only init state and Z trajectory needed
         
-        for t in range(self.N-1, max(self.q, self.q_u)-1, -1):
+        for t in range(self.N-1, max(self.q, self.q_u)-2, -1): #TODO: check 
             F_x = Fx_Fu[t][:,:self.n_aug]
             F_u = Fx_Fu[t][:,self.n_aug:]
 
@@ -138,7 +138,6 @@ class POD_iLQR(iLQR):
         #cost before forward pass
         J1 = self.calculate_total_cost(self.Z_aug_0, self.Z_aug, self.U, self.N)
 
-        self.X_temp = np.copy(self.X)
         self.Z_temp = np.copy(self.Z)
         self.U_temp = np.copy(self.U)
 
@@ -149,7 +148,6 @@ class POD_iLQR(iLQR):
 
         if (J1-J2)/del_J_alpha < self.J_change_eps:
             forward_pass_flag = 0
-            self.X = np.copy(self.X_temp)
             self.Z = np.copy(self.Z_temp)
             self.U = np.copy(self.U_temp)
         else:
@@ -170,7 +168,7 @@ class POD_iLQR(iLQR):
         d_u = np.zeros((n_u*q_u,1))
 
         for t in range(self.N):
-            if t < max(q, q_u):
+            if t < max(q, q_u)-1: #TODO: check 
                 self.U[t] = self.U_temp[t] + self.alpha*self.k[t]
                 d_u[n_u*(q_u-t-1):n_u*(q_u-t)] = self.U[t]-self.U_temp[t]
                 u[n_u*(q_u-t-1):n_u*(q_u-t)] = self.U[t]
@@ -195,16 +193,12 @@ class POD_iLQR(iLQR):
                 d_u[:n_u] = self.U[t]-self.U_temp[t]
                 u[:n_u] = self.U[t]
                 self.Z_aug[t] = np.vstack([z, u[n_u:]])
-                # self.Z_aug[t] = np.vstack([d_z, d_u[n_u:]])
-
-
 
             if t==0:
-                self.X[t] = self.model.simulate_step(self.X_0.flatten(),self.U[t].flatten()).reshape(np.shape(self.X_0))
-                self.Z[t] = self.C @ self.X[t]
+                self.Z[t] = self.model.simulate_step(0,self.U[t].flatten()).reshape((self.n_z,1))
             else:
-                self.X[t] = self.model.simulate_step(self.X[t-1].flatten(),self.U[t].flatten()).reshape(np.shape(self.X_0))
-                self.Z[t] = self.C @ self.X[t]
+                self.Z[t] = self.model.simulate_step(1,self.U[t].flatten()).reshape((self.n_z,1))
+
 
     def initialize_traj(self,u_init):
         """
@@ -218,48 +212,4 @@ class POD_iLQR(iLQR):
 
         self.U_temp = self.U
         self.forward_pass_simulate()
-        self.X_temp = self.X
         self.Z_temp = self.Z
-
-    # def calculate_total_cost(self,X_0, state_traj, control_traj, horizon):
-    #     total_cost = 0
-    #     total_cost += self.incremental_cost(X_0,control_traj[0])
-    #     for t in range(horizon-1):
-    #         total_cost += self.incremental_cost(state_traj[t],control_traj[t+1])
-    #     total_cost += self.terminal_cost(state_traj[horizon-1])
-
-    #     return total_cost
-    
-    # def incremental_cost(self,x,u):
-    #     '''
-	# 		Incremental cost in terms of state and controls.
-    #         Can be overwritten in actual working example
-	# 	'''
-    #     return (((x - self.X_N).T @ self.Q) @ (x - self.X_N)) + (((u.T) @ self.R) @ u)
-	
-    # def terminal_cost(self,x):
-    #     '''
-	# 		Terminal cost in terms of state.
-    #         Can be overwritten in actual working example
-	# 	'''
-    #     return (((x - self.X_N).T @ self.Q_final) @ (x - self.X_N)) 
-    
-    # def l_x(self, x):
-    #     """
-    #     Compute the gradient of the running cost
-    #     x : (n_x,1)
-    #     returns : l_x : (n_x,1)
-    #     """
-    #     z = np.zeros((np.shape(self.Q)[0], 1))
-    #     z[:self.n_z,:] = self.C @(x - self.X_N)
-    #     return 2*self.Q @ z
-
-    # def l_x_N(self, x):
-    #     """
-    #     Compute the gradient of the terminal cost
-    #     x : (n_x,1)
-    #     returns : l_x_N : (n_x,1)
-    #     """
-    #     z = np.zeros((np.shape(self.Q)[0], 1))
-    #     z[:self.n_z,:] = self.C @(x - self.X_N)
-    #     return 2*self.Q_final @ z

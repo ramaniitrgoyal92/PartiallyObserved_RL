@@ -19,11 +19,13 @@ from pathlib import Path
 
 class SimulateVDP:
 
-    def __init__(self,mu,nx,nu,dt):
+    def __init__(self,mu,nx,nu,dt,X_0):
         self.mu = mu
         self.nx = nx
         self.nu = nu
         self.dt = dt
+        self.X_0 = X_0
+        self.X_last = X_0
 
     def vanderpol(self,y,u):
         """ Return the derivative vector for the van der Pol equations."""
@@ -48,7 +50,33 @@ class SimulateVDP:
             y[i,:] = np.array([y1, y2])
         return y
 
-    def simulate_trajectory(self, y_init = np.array([2.0,0.0]), u = np.array([0.0]), horizon=1, n_per_step = 20):
+    def simulate_trajectory(self, y_init = 0, u = np.array([0.0]), horizon=1, n_per_step = 20):
+        """
+        Simulates the trajectory of the Van der Pol oscillator over a given time horizon.
+
+        Parameters
+        ----------
+        y_init : 0 for initializing with X_0
+        u : np.ndarray, optional
+            Control input sequence (default is np.array([0.0])).
+        horizon : int, optional
+            Number of time steps to simulate (default is 1).
+        n_per_step : int, optional
+            Number of RK4 integration steps per time step (default is 20).
+
+        Returns
+        -------
+        np.ndarray
+            Array of state vectors over the trajectory.
+        """
+
+        if isinstance(y_init, (int, float)) and y_init == 0:
+            self.X_last = self.X_0.flatten()
+        elif isinstance(y_init, (int, float)) and y_init == 1:
+            pass
+        else:
+            self.X_last = np.atleast_1d(y_init).flatten()
+        
         if u.shape[0] !=horizon:
             u = np.zeros([horizon])
         u = u.flatten()
@@ -58,12 +86,12 @@ class SimulateVDP:
         self.Y = np.zeros((total_steps, self.nx))
         
         # Store initial state
-        self.Y[0, :] = y_init
+        self.Y[0, :] = self.X_last
 
         for i in range(horizon):
-            y = self.onestep_rk4(y_init, n_per_step, u[i])
+            y = self.onestep_rk4(self.X_last, n_per_step, u[i])
             self.Y[i+1, :] = y[-1]
-            y_init = y[-1]
+            self.X_last = y[-1]
         return self.Y
     
     def draw_figure(self, save_to_path=None):
@@ -99,7 +127,7 @@ if __name__ == '__main__':
     # control = np.load(file).flatten()
     # control = np.zeros((time_horizon))
 
-    sim_module = SimulateVDP(mu, nx, nu, dt)
+    sim_module = SimulateVDP(mu, nx, nu, dt, y_init)
     sim_module.simulate_trajectory(u=control, horizon=time_horizon)
     # sim_module.simulate_vdp(y_init, control)
     sim_module.draw_figure()

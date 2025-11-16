@@ -17,11 +17,14 @@ from ltv_sys_id import LTV_SysID
 
 class RunVdp(SimulateVDP):
 
-    def __init__(self, mu, state_dimension, control_dimension, dt):
-        SimulateVDP.__init__(self, mu, state_dimension, control_dimension, dt)
+    def __init__(self, mu, state_dimension, control_dimension, dt, init_state):
+        SimulateVDP.__init__(self, mu, state_dimension, control_dimension, dt, init_state)
 
     def simulate_step(self,x,u):
-        return self.simulate_trajectory(x, u)[-1]
+        return super().simulate_trajectory(x, u)[-1]
+    
+    def simulate_trajectory(self, y_init=0, u = np.array([0.0]), horizon=1):
+        return super().simulate_trajectory(y_init, u, horizon)
 
 
 if __name__=="__main__":
@@ -45,10 +48,10 @@ if __name__=="__main__":
     print('Goal phase : \n', final_state)
 	
     # No. of ILQR iterations to run
-    n_iterations = 10
+    n_iterations = 5
 
     # Create model instance
-    run_vdp = RunVdp(mu, state_dimension, control_dimension, dt)
+    run_vdp = RunVdp(mu, state_dimension, control_dimension, dt, init_state)
 
     # Create iLQR instance
     ilqr = iLQR(run_vdp, state_dimension, control_dimension, alpha, horizon, init_state, final_state, Q, Q_final, R, 
