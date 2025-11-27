@@ -69,7 +69,7 @@ class POD_iLQR(iLQR):
         """
         Carry out the backward pass to compute the feedforward and feedback gains
         returns : backward_pass_flag : indicates if backward pass was successful
-                  del_J_alpha : expected cost reduction
+        del_J_alpha : expected cost reduction
         """
         ################## defining local functions & variables for faster access ################
         k = np.copy(self.k)
